@@ -1,0 +1,98 @@
+// Minimal, opinionated reset for the app shell.
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: var(--ts-font-sans);
+  font-size: var(--ts-fs-base);
+  line-height: var(--ts-lh-normal);
+  color: var(--ts-text);
+  background: var(--ts-bg);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow: hidden; // app owns its own scroll regions
+}
+
+h1, h2, h3, h4, h5, h6, p, figure {
+  margin: 0;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+input {
+  font: inherit;
+  color: inherit;
+}
+
+a {
+  color: var(--ts-accent);
+  text-decoration: none;
+}
+
+ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--ts-accent);
+  outline-offset: 1px;
+  border-radius: var(--ts-radius-xs);
+}
+
+// Text inputs paint their own focus affordance (accent border/shadow on the
+// field or its wrapper) — stacking the global ring on top reads as a glitch.
+input:focus-visible {
+  outline: none;
+}
+
+// Scrollbars — themed, thin, unobtrusive.
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--ts-border-strong) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--ts-border-strong);
+  border: 3px solid transparent;
+  background-clip: padding-box;
+  border-radius: var(--ts-radius-pill);
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--ts-text-faint);
+  background-clip: padding-box;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

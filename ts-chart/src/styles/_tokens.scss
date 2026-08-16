@@ -1,0 +1,169 @@
+// =============================================================================
+// TS Chart — Design Tokens
+// Single source of truth for the theme. Components consume --ts-* vars only.
+// Dark is the default; light is a remap of the SAME token names.
+// Palette derived from the authored SVG "terminal chart" design system.
+// =============================================================================
+
+:root {
+  // --- Spacing scale (4pt) -------------------------------------------------
+  --ts-space-0: 0;
+  --ts-space-1: 4px;
+  --ts-space-2: 8px;
+  --ts-space-3: 12px;
+  --ts-space-4: 16px;
+  --ts-space-5: 20px;
+  --ts-space-6: 24px;
+  --ts-space-8: 32px;
+  --ts-space-10: 40px;
+  --ts-space-12: 48px;
+
+  // --- Radius --------------------------------------------------------------
+  --ts-radius-xs: 4px;
+  --ts-radius-sm: 6px;
+  --ts-radius-md: 8px;
+  --ts-radius-lg: 12px;
+  --ts-radius-xl: 16px;
+  --ts-radius-pill: 999px;
+
+  // --- Typography ----------------------------------------------------------
+  --ts-font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --ts-font-mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+
+  --ts-fs-xxs: 10px;
+  --ts-fs-xs: 11px;
+  --ts-fs-sm: 12px;
+  --ts-fs-md: 13px;
+  --ts-fs-base: 14px;
+  --ts-fs-lg: 16px;
+  --ts-fs-xl: 20px;
+  --ts-fs-2xl: 26px;
+
+  --ts-fw-regular: 400;
+  --ts-fw-medium: 500;
+  --ts-fw-semibold: 600;
+  --ts-fw-bold: 700;
+
+  --ts-lh-tight: 1.2;
+  --ts-lh-normal: 1.45;
+
+  // --- Density (overridden by [data-density='compact']) --------------------
+  --ts-row-h: 30px;
+  --ts-toolbar-h: 48px;
+  --ts-tabbar-h: 40px;
+
+  // --- Motion --------------------------------------------------------------
+  --ts-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --ts-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ts-dur-1: 120ms;
+  --ts-dur-2: 180ms;
+  --ts-dur-3: 240ms;
+
+  // --- Z-index -------------------------------------------------------------
+  --ts-z-panel: 10;
+  --ts-z-toolbar: 40;
+  --ts-z-overlay: 1000;
+  --ts-z-drawer: 900;
+
+  // --- Semantic status (theme-agnostic hues) -------------------------------
+  --ts-up: #26c281;   // positive / bullish
+  --ts-down: #ef5f6b; // negative / bearish
+  --ts-warn: #f5a623;
+}
+
+// -----------------------------------------------------------------------------
+// DARK THEME (default) — authored palette
+// -----------------------------------------------------------------------------
+:root,
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  // Neutral-dark ladder (whisper of cool, TradingView-class) — a blue-saturated
+  // surface fights the blue accent and blue series lines; near-neutral wins.
+  --ts-bg: #0d0f12;            // app background
+  --ts-bg-elevated: #12151a;   // panel / card surface
+  --ts-bg-inset: #0a0c0f;      // inset wells, chart body
+  --ts-bg-hover: #191d23;      // hover fill
+  --ts-bg-active: #20252c;     // active/selected fill
+  --ts-bg-scrim: rgba(8, 9, 11, 0.62); // drawer/modal scrim
+
+  --ts-border: #252a31;        // primary border
+  --ts-border-strong: #333a43; // emphasized border
+  --ts-border-subtle: #1b1f25; // hairline
+
+  --ts-grid-strong: #1d2127;   // chart grid major
+  --ts-grid-weak: #16191e;     // chart grid minor
+
+  --ts-text: #d7dde4;          // primary text
+  --ts-text-bright: #f3f6f9;   // headings / values
+  --ts-text-secondary: #aeb7c1;
+  --ts-text-muted: #8b96a3;    // labels, axis — ≥4.5:1 on panels (numeric-safe)
+  --ts-text-faint: #59636e;    // decoration only, never numbers
+
+  --ts-accent: #3fb6f0;        // primary accent / default series
+  --ts-accent-strong: #5cc4f5;
+  --ts-accent-weak: rgba(63, 182, 240, 0.14);
+  --ts-accent-contrast: #06121b;
+
+  --ts-highlight: #f5a623;     // price pill / today marker
+  --ts-highlight-contrast: #0b0e13;
+
+  --ts-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --ts-shadow-2: 0 4px 16px rgba(0, 0, 0, 0.45);
+  --ts-shadow-3: 0 12px 40px rgba(0, 0, 0, 0.55);
+
+  --ts-skeleton-base: #15181d;
+  --ts-skeleton-shine: #1f242b;
+}
+
+// -----------------------------------------------------------------------------
+// LIGHT THEME — same token names, remapped
+// -----------------------------------------------------------------------------
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  --ts-bg: #f5f7fa;
+  --ts-bg-elevated: #ffffff;
+  --ts-bg-inset: #eef1f6;
+  --ts-bg-hover: #eef2f7;
+  --ts-bg-active: #e3ecf6;
+  --ts-bg-scrim: rgba(15, 23, 32, 0.32);
+
+  --ts-border: #dbe2ea;
+  --ts-border-strong: #c3cedb;
+  --ts-border-subtle: #e8edf3;
+
+  --ts-grid-strong: #e5eaf1;
+  --ts-grid-weak: #eef2f7;
+
+  --ts-text: #26313f;
+  --ts-text-bright: #0c1219;
+  --ts-text-secondary: #455163;
+  --ts-text-muted: #6b7787;
+  --ts-text-faint: #a9b3c0;
+
+  --ts-accent: #1f8fd0;
+  --ts-accent-strong: #1478b4;
+  --ts-accent-weak: rgba(31, 143, 208, 0.12);
+  --ts-accent-contrast: #ffffff;
+
+  --ts-highlight: #d9861a;
+  --ts-highlight-contrast: #ffffff;
+
+  --ts-shadow-1: 0 1px 2px rgba(15, 23, 32, 0.08);
+  --ts-shadow-2: 0 6px 20px rgba(15, 23, 32, 0.12);
+  --ts-shadow-3: 0 16px 44px rgba(15, 23, 32, 0.18);
+
+  --ts-up: #10a56a;
+  --ts-down: #e0384a;
+
+  --ts-skeleton-base: #e9edf3;
+  --ts-skeleton-shine: #f3f6fa;
+}
+
+// --- Compact density ---------------------------------------------------------
+:root[data-density='compact'] {
+  --ts-row-h: 24px;
+  --ts-toolbar-h: 42px;
+  --ts-tabbar-h: 34px;
+}

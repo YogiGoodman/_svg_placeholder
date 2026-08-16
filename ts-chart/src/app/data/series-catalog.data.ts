@@ -1,0 +1,568 @@
+// =============================================================================
+// Hardcoded catalog: ~30 well-known forecast/market series across 3 tabs.
+// SERIES holds metadata; TREES hold the per-tab taxonomy (leaves -> seriesId).
+// Values are realistic anchors for famous public data sources (no live data).
+// =============================================================================
+
+import { SeriesMeta, TabId, TreeNode } from './models';
+
+
+function m(x: SeriesMeta): SeriesMeta {
+  return x;
+}
+
+export const SERIES: Record<string, SeriesMeta> = {
+  // --- Crude oil -------------------------------------------------------------
+  brent: m({
+    id: 'brent', name: 'Brent Crude Oil', symbol: 'BRN', tab: 'forecast',
+    path: ['Energy', 'Crude Oil'], unit: 'USD/bbl', currency: 'USD',
+    source: 'ICE Brent (reference)', frequency: 'daily', chartKind: 'area',
+    tags: ['energy', 'oil', 'benchmark'],
+    description: 'North Sea Brent crude — the leading global oil price benchmark, pricing roughly two-thirds of internationally traded crude.',
+    shape: { base: 82.4, drift: 0.04, volatility: 0.014, seasonality: 0.05, floor: 20 },
+  }),
+  wti: m({
+    id: 'wti', name: 'WTI Crude Oil', symbol: 'CL', tab: 'forecast',
+    path: ['Energy', 'Crude Oil'], unit: 'USD/bbl', currency: 'USD',
+    source: 'NYMEX WTI (reference)', frequency: 'daily', chartKind: 'area',
+    tags: ['energy', 'oil', 'benchmark'],
+    description: 'West Texas Intermediate — the US crude benchmark delivered at Cushing, Oklahoma.',
+    shape: { base: 78.1, drift: 0.035, volatility: 0.015, seasonality: 0.05, floor: 15 },
+  }),
+  // --- Natural gas -----------------------------------------------------------
+  ttf: m({
+    id: 'ttf', name: 'Dutch TTF Natural Gas', symbol: 'TTF', tab: 'forecast',
+    path: ['Energy', 'Natural Gas'], unit: 'EUR/MWh', currency: 'EUR',
+    source: 'ICE Endex TTF (reference)', frequency: 'daily', chartKind: 'area',
+    tags: ['energy', 'gas', 'europe'],
+    description: 'Title Transfer Facility — the European natural-gas benchmark hub in the Netherlands. Strong winter seasonality.',
+    shape: { base: 34.2, drift: -0.02, volatility: 0.032, seasonality: 0.22, seasonPhase: 200, floor: 4 },
+  }),
+  henryhub: m({
+    id: 'henryhub', name: 'Henry Hub Natural Gas', symbol: 'NG', tab: 'forecast',
+    path: ['Energy', 'Natural Gas'], unit: 'USD/MMBtu', currency: 'USD',
+    source: 'NYMEX Henry Hub (reference)', frequency: 'daily', chartKind: 'area',
+    tags: ['energy', 'gas', 'us'],
+    description: 'US natural-gas benchmark priced at the Henry Hub in Louisiana.',
+    shape: { base: 2.84, drift: 0.03, volatility: 0.03, seasonality: 0.18, seasonPhase: 200, floor: 1.2 },
+  }),
+  nbp: m({
+    id: 'nbp', name: 'UK NBP Natural Gas', symbol: 'NBP', tab: 'forecast',
+    path: ['Energy', 'Natural Gas'], unit: 'GBp/therm', currency: 'GBP',
+    source: 'ICE NBP (reference)', frequency: 'daily', chartKind: 'area',
+    tags: ['energy', 'gas', 'uk'],
+    description: 'National Balancing Point — the UK wholesale gas benchmark quoted in pence per therm.',
+    shape: { base: 84.5, drift: -0.01, volatility: 0.03, seasonality: 0.2, seasonPhase: 200, floor: 10 },
+  }),
+  // --- Power -----------------------------------------------------------------
+  'de-power': m({
+    id: 'de-power', name: 'German Baseload Power', symbol: 'DEB', tab: 'forecast',
+    path: ['Power', 'Day-Ahead'], unit: 'EUR/MWh', currency: 'EUR',
+    source: 'EPEX SPOT DE (reference)', frequency: 'daily', chartKind: 'line',
+    tags: ['power', 'europe'],
+    description: 'German day-ahead baseload electricity price — Europe’s most liquid power market.',
+    shape: { base: 91.0, drift: -0.03, volatility: 0.05, seasonality: 0.12, seasonPhase: 200, floor: -20 },
+  }),
+  'fr-power': m({
+    id: 'fr-power', name: 'French Baseload Power', symbol: 'FRB', tab: 'forecast',
+    path: ['Power', 'Day-Ahead'], unit: 'EUR/MWh', currency: 'EUR',
+    source: 'EPEX SPOT FR (reference)', frequency: 'daily', chartKind: 'line',
+    tags: ['power', 'europe'],
+    description: 'French day-ahead baseload electricity price, heavily nuclear-driven.',
+    shape: { base: 85.5, drift: -0.02, volatility: 0.05, seasonality: 0.13, seasonPhase: 200, floor: -15 },
+  }),
+  nordpool: m({
+    id: 'nordpool', name: 'Nord Pool System Price', symbol: 'NPS', tab: 'forecast',
+    path: ['Power', 'Day-Ahead'], unit: 'EUR/MWh', currency: 'EUR',
+    source: 'Nord Pool (reference)', frequency: 'daily', chartKind: 'line',
+    tags: ['power', 'nordics'],
+    description: 'Nordic system electricity price — hydro-dominated, seasonally wet/dry.',
+    shape: { base: 58.4, drift: -0.02, volatility: 0.06, seasonality: 0.18, seasonPhase: 120, floor: 0 },
+  }),
+  // --- Carbon ----------------------------------------------------------------
+  eua: m({
+    id: 'eua', name: 'EU Carbon (EUA)', symbol: 'EUA', tab: 'forecast',
+    path: ['Carbon'], unit: 'EUR/t', currency: 'EUR',
+    source: 'ICE EUA Dec (reference)', frequency: 'daily', chartKind: 'area',
+    tags: ['carbon', 'europe', 'ets'],
+    description: 'EU Emission Allowance — the price of one tonne of CO₂ under the EU Emissions Trading System.',
+    shape: { base: 68.3, drift: 0.06, volatility: 0.02, seasonality: 0.04, floor: 5 },
+  }),
+  uka: m({
+    id: 'uka', name: 'UK Carbon (UKA)', symbol: 'UKA', tab: 'forecast',
+    path: ['Carbon'], unit: 'GBP/t', currency: 'GBP',
+    source: 'ICE UKA (reference)', frequency: 'daily', chartKind: 'area',
+    tags: ['carbon', 'uk', 'ets'], status: 'forbidden',
+    description: 'UK Allowance under the UK Emissions Trading Scheme (post-Brexit standalone carbon market).',
+    shape: { base: 41.2, drift: 0.02, volatility: 0.028, seasonality: 0.04, floor: 5 },
+  }),
+  // --- Weather ---------------------------------------------------------------
+  'temp-eu': m({
+    id: 'temp-eu', name: 'CWE Temperature Forecast', symbol: 'T2M', tab: 'forecast',
+    path: ['Weather', 'Temperature'], unit: '°C', currency: undefined,
+    source: 'ECMWF ensemble (reference)', frequency: 'daily', chartKind: 'line',
+    tags: ['weather', 'temperature'],
+    description: 'Central-Western Europe population-weighted 2m air temperature forecast. Drives heating/cooling demand.',
+    shape: { base: 12.5, drift: 0.01, volatility: 0.06, seasonality: 0.9, seasonPhase: 20 },
+  }),
+  'wind-de': m({
+    id: 'wind-de', name: 'German Wind Generation', symbol: 'WND', tab: 'forecast',
+    path: ['Weather', 'Renewables'], unit: 'GW', currency: undefined,
+    source: 'ENTSO-E / DWD (reference)', frequency: 'daily', chartKind: 'area',
+    tags: ['weather', 'wind', 'renewables'],
+    description: 'Forecast German wind power output. High day-to-day variability, winter-weighted.',
+    shape: { base: 14.2, drift: 0.04, volatility: 0.14, seasonality: 0.35, seasonPhase: 200, floor: 0.5 },
+  }),
+  'solar-es': m({
+    id: 'solar-es', name: 'Iberian Solar Generation', symbol: 'SOL', tab: 'forecast',
+    path: ['Weather', 'Renewables'], unit: 'GW', currency: undefined,
+    source: 'ENTSO-E / AEMET (reference)', frequency: 'daily', chartKind: 'area',
+    tags: ['weather', 'solar', 'renewables'],
+    description: 'Forecast Iberian solar PV output. Strong summer peak, near-zero winter troughs.',
+    shape: { base: 8.6, drift: 0.06, volatility: 0.09, seasonality: 0.6, seasonPhase: 20, floor: 0.2 },
+  }),
+  // --- Agriculture -----------------------------------------------------------
+  wheat: m({
+    id: 'wheat', name: 'Milling Wheat', symbol: 'EBM', tab: 'forecast',
+    path: ['Agriculture'], unit: 'EUR/t', currency: 'EUR',
+    source: 'Euronext Milling Wheat (reference)', frequency: 'daily', chartKind: 'line',
+    tags: ['ags', 'grains'],
+    description: 'Euronext milling wheat futures reference price — European feed & food benchmark.',
+    shape: { base: 221.0, drift: 0.0, volatility: 0.018, seasonality: 0.06, seasonPhase: 150, floor: 120 },
+  }),
+  corn: m({
+    id: 'corn', name: 'Corn', symbol: 'EMA', tab: 'forecast',
+    path: ['Agriculture'], unit: 'EUR/t', currency: 'EUR',
+    source: 'Euronext Corn (reference)', frequency: 'daily', chartKind: 'line',
+    tags: ['ags', 'grains'],
+    description: 'Euronext corn futures reference price.',
+    shape: { base: 198.5, drift: 0.0, volatility: 0.017, seasonality: 0.06, seasonPhase: 150, floor: 110 },
+  }),
+  // --- Metals ----------------------------------------------------------------
+  gold: m({
+    id: 'gold', name: 'Gold', symbol: 'XAU', tab: 'forecast',
+    path: ['Metals', 'Precious'], unit: 'USD/oz', currency: 'USD',
+    source: 'LBMA / COMEX (reference)', frequency: 'daily', chartKind: 'area',
+    tags: ['metals', 'safe-haven'],
+    description: 'Spot gold price per troy ounce — the classic safe-haven store of value.',
+    shape: { base: 2358.0, drift: 0.09, volatility: 0.01, seasonality: 0.02, floor: 800 },
+  }),
+  copper: m({
+    id: 'copper', name: 'Copper', symbol: 'HG', tab: 'forecast',
+    path: ['Metals', 'Base'], unit: 'USD/t', currency: 'USD',
+    source: 'LME Copper (reference)', frequency: 'daily', chartKind: 'area',
+    tags: ['metals', 'industrial'],
+    description: 'LME copper — the bellwether industrial metal, closely tracking global growth.',
+    shape: { base: 9240.0, drift: 0.05, volatility: 0.015, seasonality: 0.03, floor: 4000 },
+  }),
+
+  // === Contracts tab =========================================================
+  'brent-fm': m({
+    id: 'brent-fm', name: 'Brent Front Month', symbol: 'BRN M1', tab: 'contracts',
+    path: ['Absolute Contracts'], unit: 'USD/bbl', currency: 'USD',
+    source: 'ICE Brent front month', frequency: 'daily', chartKind: 'candlestick',
+    tags: ['oil', 'front-month'],
+    description: 'Nearest-expiry Brent futures contract (absolute, un-rolled).',
+    shape: { base: 82.9, drift: 0.04, volatility: 0.016, seasonality: 0.05, floor: 20 },
+  }),
+  'ttf-cal26': m({
+    id: 'ttf-cal26', name: 'TTF Calendar 2026', symbol: 'TTF CAL26', tab: 'contracts',
+    path: ['Absolute Contracts'], unit: 'EUR/MWh', currency: 'EUR',
+    source: 'ICE Endex TTF Cal-26', frequency: 'daily', chartKind: 'candlestick',
+    tags: ['gas', 'calendar'],
+    description: 'TTF calendar-year 2026 baseload gas contract (annual average delivery).',
+    shape: { base: 33.1, drift: -0.01, volatility: 0.022, seasonality: 0.05, floor: 6 },
+  }),
+  'brent-c1': m({
+    id: 'brent-c1', name: 'Brent Continuous M+1', symbol: 'BRN C1', tab: 'contracts',
+    path: ['Continuous Contracts'], unit: 'USD/bbl', currency: 'USD',
+    source: 'ICE Brent rolled M+1', frequency: 'daily', chartKind: 'line',
+    tags: ['oil', 'continuous'],
+    description: 'Continuous first-position Brent, back-adjusted across monthly rolls.',
+    shape: { base: 82.4, drift: 0.04, volatility: 0.014, seasonality: 0.05, floor: 20 },
+  }),
+  'wti-c1': m({
+    id: 'wti-c1', name: 'WTI Continuous M+1', symbol: 'CL C1', tab: 'contracts',
+    path: ['Continuous Contracts'], unit: 'USD/bbl', currency: 'USD',
+    source: 'NYMEX WTI rolled M+1', frequency: 'daily', chartKind: 'line',
+    tags: ['oil', 'continuous'],
+    description: 'Continuous first-position WTI, back-adjusted across monthly rolls.',
+    shape: { base: 78.0, drift: 0.035, volatility: 0.015, seasonality: 0.05, floor: 15 },
+  }),
+  'eua-dec26': m({
+    id: 'eua-dec26', name: 'EUA December 2026', symbol: 'EUA DEC26', tab: 'contracts',
+    path: ['Futures', 'Monthly Rolling'], unit: 'EUR/t', currency: 'EUR',
+    source: 'ICE EUA Dec-26', frequency: 'daily', chartKind: 'candlestick',
+    tags: ['carbon', 'futures'],
+    description: 'December 2026 EU carbon allowance future — the benchmark ETS delivery month.',
+    shape: { base: 71.0, drift: 0.06, volatility: 0.021, seasonality: 0.04, floor: 5 },
+  }),
+  'ttf-q127': m({
+    id: 'ttf-q127', name: 'TTF Q1 2027', symbol: 'TTF Q127', tab: 'contracts',
+    path: ['Futures', 'Monthly Rolling'], unit: 'EUR/MWh', currency: 'EUR',
+    source: 'ICE Endex TTF Q1-27', frequency: 'daily', chartKind: 'candlestick',
+    tags: ['gas', 'quarterly'],
+    description: 'TTF Q1 2027 gas contract — winter-quarter delivery, premium to summer.',
+    shape: { base: 38.5, drift: -0.01, volatility: 0.026, seasonality: 0.08, floor: 8 },
+  }),
+  'hh-jan27': m({
+    id: 'hh-jan27', name: 'Henry Hub January 2027', symbol: 'NG JAN27', tab: 'contracts',
+    path: ['Futures', 'Monthly Rolling'], unit: 'USD/MMBtu', currency: 'USD',
+    source: 'NYMEX Henry Hub Jan-27', frequency: 'daily', chartKind: 'candlestick',
+    tags: ['gas', 'futures'], status: 'missing',
+    description: 'January 2027 US gas future — peak-winter heating demand month.',
+    shape: { base: 3.35, drift: 0.03, volatility: 0.03, seasonality: 0.1, floor: 1.2 },
+  }),
+  'brent-wti-spread': m({
+    id: 'brent-wti-spread', name: 'Brent–WTI Spread', symbol: 'BRN-CL', tab: 'contracts',
+    path: ['Spreads'], unit: 'USD/bbl', currency: 'USD',
+    source: 'ICE / NYMEX (derived)', frequency: 'daily', chartKind: 'line',
+    tags: ['oil', 'spread'],
+    description: 'Price differential between Brent and WTI crude — a key transatlantic arbitrage signal.',
+    shape: { base: 4.3, drift: 0.0, volatility: 0.12, seasonality: 0.1 },
+  }),
+  'ttf-nbp-spread': m({
+    id: 'ttf-nbp-spread', name: 'TTF–NBP Spread', symbol: 'TTF-NBP', tab: 'contracts',
+    path: ['Spreads'], unit: 'EUR/MWh', currency: 'EUR',
+    source: 'ICE (derived)', frequency: 'daily', chartKind: 'line',
+    tags: ['gas', 'spread'],
+    description: 'Dutch TTF minus UK NBP gas spread — drives interconnector flows across the Channel.',
+    shape: { base: 1.1, drift: 0.0, volatility: 0.25, seasonality: 0.15 },
+  }),
+
+  // === Regions tab (new series) =============================================
+  pjm: m({
+    id: 'pjm', name: 'PJM West Hub Power', symbol: 'PJM', tab: 'regions',
+    path: ['North America', 'United States'], unit: 'USD/MWh', currency: 'USD',
+    source: 'PJM Interconnection (reference)', frequency: 'daily', chartKind: 'line',
+    tags: ['power', 'us'],
+    description: 'PJM Western Hub day-ahead LMP — the largest US wholesale electricity market.',
+    shape: { base: 42.5, drift: 0.02, volatility: 0.07, seasonality: 0.14, seasonPhase: 200, floor: -10 },
+  }),
+  ercot: m({
+    id: 'ercot', name: 'ERCOT North Power', symbol: 'ERCOT', tab: 'regions',
+    path: ['North America', 'United States'], unit: 'USD/MWh', currency: 'USD',
+    source: 'ERCOT (reference)', frequency: 'daily', chartKind: 'line',
+    tags: ['power', 'us', 'texas'], status: 'missing',
+    description: 'ERCOT North zone electricity price — famous for extreme summer scarcity spikes.',
+    shape: { base: 38.0, drift: 0.03, volatility: 0.13, seasonality: 0.25, seasonPhase: 20, floor: -20 },
+  }),
+  jkm: m({
+    id: 'jkm', name: 'JKM LNG (Asia)', symbol: 'JKM', tab: 'regions',
+    path: ['Asia Pacific', 'LNG'], unit: 'USD/MMBtu', currency: 'USD',
+    source: 'Platts JKM (reference)', frequency: 'daily', chartKind: 'area',
+    tags: ['lng', 'asia'],
+    description: 'Japan-Korea Marker — the benchmark spot price for LNG delivered into Northeast Asia.',
+    shape: { base: 12.4, drift: -0.01, volatility: 0.035, seasonality: 0.2, seasonPhase: 200, floor: 4 },
+  }),
+
+  // === Additional catalog (to 50 series) =====================================
+  // --- Crude & refined products ---------------------------------------------
+  dubai: m({
+    id: 'dubai', name: 'Dubai Crude Oil', symbol: 'DUB', tab: 'forecast',
+    path: ['Energy', 'Crude Oil'], unit: 'USD/bbl', currency: 'USD',
+    source: 'Platts Dubai (reference)', frequency: 'daily', chartKind: 'area',
+    tags: ['energy', 'oil', 'benchmark', 'asia'],
+    description: 'Dubai crude — the pricing benchmark for Middle East sour crude flowing to Asia.',
+    shape: { base: 80.6, drift: 0.035, volatility: 0.015, seasonality: 0.05, floor: 15 },
+  }),
+  gasoil: m({
+    id: 'gasoil', name: 'ICE Gasoil', symbol: 'GO', tab: 'forecast',
+    path: ['Energy', 'Refined Products'], unit: 'USD/t', currency: 'USD',
+    source: 'ICE Gasoil (reference)', frequency: 'daily', chartKind: 'line',
+    tags: ['energy', 'oil', 'products'],
+    description: 'ICE low-sulphur gasoil — the European middle-distillate (diesel/heating oil) benchmark.',
+    shape: { base: 735.0, drift: 0.03, volatility: 0.017, seasonality: 0.06, seasonPhase: 200, floor: 200 },
+  }),
+  rbob: m({
+    id: 'rbob', name: 'RBOB Gasoline', symbol: 'RB', tab: 'forecast',
+    path: ['Energy', 'Refined Products'], unit: 'USD/gal', currency: 'USD',
+    source: 'NYMEX RBOB (reference)', frequency: 'daily', chartKind: 'line',
+    tags: ['energy', 'oil', 'products', 'us'],
+    description: 'Reformulated blendstock gasoline — the US gasoline futures benchmark. Strong summer driving season.',
+    shape: { base: 2.42, drift: 0.03, volatility: 0.02, seasonality: 0.12, seasonPhase: 60, floor: 0.5 },
+  }),
+  // --- Gas hubs --------------------------------------------------------------
+  psv: m({
+    id: 'psv', name: 'Italian PSV Gas', symbol: 'PSV', tab: 'forecast',
+    path: ['Energy', 'Natural Gas'], unit: 'EUR/MWh', currency: 'EUR',
+    source: 'GME PSV (reference)', frequency: 'daily', chartKind: 'area',
+    tags: ['energy', 'gas', 'europe'],
+    description: 'Punto di Scambio Virtuale — the Italian wholesale gas hub, at a premium to TTF.',
+    shape: { base: 37.1, drift: -0.02, volatility: 0.03, seasonality: 0.2, seasonPhase: 200, floor: 5 },
+  }),
+  the: m({
+    id: 'the', name: 'German THE Gas', symbol: 'THE', tab: 'forecast',
+    path: ['Energy', 'Natural Gas'], unit: 'EUR/MWh', currency: 'EUR',
+    source: 'Trading Hub Europe (reference)', frequency: 'daily', chartKind: 'area',
+    tags: ['energy', 'gas', 'europe'],
+    description: 'Trading Hub Europe — the merged German gas market area benchmark.',
+    shape: { base: 34.9, drift: -0.02, volatility: 0.03, seasonality: 0.21, seasonPhase: 200, floor: 5 },
+  }),
+  // --- Power -----------------------------------------------------------------
+  'it-power': m({
+    id: 'it-power', name: 'Italian Baseload Power', symbol: 'ITB', tab: 'forecast',
+    path: ['Power', 'Day-Ahead'], unit: 'EUR/MWh', currency: 'EUR',
+    source: 'GME PUN (reference)', frequency: 'daily', chartKind: 'line',
+    tags: ['power', 'europe'],
+    description: 'Italian single national price (PUN) day-ahead power — typically Europe’s priciest major market.',
+    shape: { base: 112.0, drift: -0.02, volatility: 0.05, seasonality: 0.14, seasonPhase: 40, floor: 0 },
+  }),
+  'es-power': m({
+    id: 'es-power', name: 'Spanish Baseload Power', symbol: 'ESB', tab: 'forecast',
+    path: ['Power', 'Day-Ahead'], unit: 'EUR/MWh', currency: 'EUR',
+    source: 'OMIE (reference)', frequency: 'daily', chartKind: 'line',
+    tags: ['power', 'europe', 'iberia'],
+    description: 'Spanish (OMIE) day-ahead power — high solar penetration drives deep midday troughs.',
+    shape: { base: 68.0, drift: -0.02, volatility: 0.06, seasonality: 0.15, seasonPhase: 40, floor: -5 },
+  }),
+  // --- Carbon ----------------------------------------------------------------
+  cca: m({
+    id: 'cca', name: 'California Carbon (CCA)', symbol: 'CCA', tab: 'forecast',
+    path: ['Carbon'], unit: 'USD/t', currency: 'USD',
+    source: 'ICE CCA (reference)', frequency: 'daily', chartKind: 'area',
+    tags: ['carbon', 'us', 'ets'],
+    description: 'California Carbon Allowance — the price of one tonne of CO₂ under California’s cap-and-trade.',
+    shape: { base: 38.5, drift: 0.04, volatility: 0.018, seasonality: 0.03, floor: 5 },
+  }),
+  // --- Metals ----------------------------------------------------------------
+  silver: m({
+    id: 'silver', name: 'Silver', symbol: 'XAG', tab: 'forecast',
+    path: ['Metals', 'Precious'], unit: 'USD/oz', currency: 'USD',
+    source: 'LBMA / COMEX (reference)', frequency: 'daily', chartKind: 'area',
+    tags: ['metals', 'safe-haven'],
+    description: 'Spot silver — the higher-beta precious metal, both monetary and industrial.',
+    shape: { base: 29.4, drift: 0.07, volatility: 0.02, seasonality: 0.03, floor: 8 },
+  }),
+  aluminium: m({
+    id: 'aluminium', name: 'Aluminium', symbol: 'ALU', tab: 'forecast',
+    path: ['Metals', 'Base'], unit: 'USD/t', currency: 'USD',
+    source: 'LME Aluminium (reference)', frequency: 'daily', chartKind: 'area',
+    tags: ['metals', 'industrial'],
+    description: 'LME aluminium — an energy-intensive base metal sensitive to power prices.',
+    shape: { base: 2480.0, drift: 0.03, volatility: 0.014, seasonality: 0.03, floor: 1200 },
+  }),
+  nickel: m({
+    id: 'nickel', name: 'Nickel', symbol: 'NI', tab: 'forecast',
+    path: ['Metals', 'Base'], unit: 'USD/t', currency: 'USD',
+    source: 'LME Nickel (reference)', frequency: 'daily', chartKind: 'area',
+    tags: ['metals', 'industrial', 'battery'],
+    description: 'LME nickel — a key stainless-steel and EV-battery metal, historically volatile.',
+    shape: { base: 16800.0, drift: 0.0, volatility: 0.028, seasonality: 0.03, floor: 8000 },
+  }),
+  // --- Agriculture -----------------------------------------------------------
+  soybean: m({
+    id: 'soybean', name: 'Soybeans', symbol: 'ZS', tab: 'forecast',
+    path: ['Agriculture'], unit: 'USd/bu', currency: 'USD',
+    source: 'CBOT Soybeans (reference)', frequency: 'daily', chartKind: 'line',
+    tags: ['ags', 'oilseeds'],
+    description: 'CBOT soybeans — the global oilseed benchmark, weather- and export-driven.',
+    shape: { base: 1180.0, drift: 0.0, volatility: 0.016, seasonality: 0.07, seasonPhase: 150, floor: 700 },
+  }),
+  sugar: m({
+    id: 'sugar', name: 'Sugar No.11', symbol: 'SB', tab: 'forecast',
+    path: ['Agriculture'], unit: 'USd/lb', currency: 'USD',
+    source: 'ICE Sugar No.11 (reference)', frequency: 'daily', chartKind: 'line',
+    tags: ['ags', 'softs'],
+    description: 'ICE raw sugar — the world softs benchmark, tied to Brazilian cane and ethanol.',
+    shape: { base: 21.3, drift: 0.0, volatility: 0.02, seasonality: 0.08, seasonPhase: 120, floor: 8 },
+  }),
+  // --- Weather / freight -----------------------------------------------------
+  'hdd-us': m({
+    id: 'hdd-us', name: 'US Heating Degree Days', symbol: 'HDD', tab: 'forecast',
+    path: ['Weather', 'Degree Days'], unit: 'HDD', currency: undefined,
+    source: 'NOAA (reference)', frequency: 'daily', chartKind: 'line',
+    tags: ['weather', 'gas', 'us'],
+    description: 'US population-weighted heating degree days — the core cold-demand driver for gas & power.',
+    shape: { base: 14.0, drift: 0.0, volatility: 0.12, seasonality: 0.95, seasonPhase: 200, floor: 0 },
+  }),
+  'cdd-us': m({
+    id: 'cdd-us', name: 'US Cooling Degree Days', symbol: 'CDD', tab: 'forecast',
+    path: ['Weather', 'Degree Days'], unit: 'CDD', currency: undefined,
+    source: 'NOAA (reference)', frequency: 'daily', chartKind: 'line',
+    tags: ['weather', 'power', 'us'],
+    description: 'US population-weighted cooling degree days — the summer power-demand driver.',
+    shape: { base: 9.0, drift: 0.0, volatility: 0.14, seasonality: 0.95, seasonPhase: 20, floor: 0 },
+  }),
+  baltic: m({
+    id: 'baltic', name: 'Baltic Dry Index', symbol: 'BDI', tab: 'forecast',
+    path: ['Freight'], unit: 'points', currency: undefined,
+    source: 'Baltic Exchange (reference)', frequency: 'daily', chartKind: 'line',
+    tags: ['freight', 'shipping'],
+    description: 'Baltic Dry Index — dry-bulk ocean freight rates, a bellwether of global commodity trade.',
+    shape: { base: 1720.0, drift: 0.0, volatility: 0.04, seasonality: 0.12, seasonPhase: 150, floor: 300 },
+  }),
+
+  // --- Extra contracts -------------------------------------------------------
+  'ttf-sum26': m({
+    id: 'ttf-sum26', name: 'TTF Summer 2026', symbol: 'TTF SUM26', tab: 'contracts',
+    path: ['Futures', 'Seasonal'], unit: 'EUR/MWh', currency: 'EUR',
+    source: 'ICE Endex TTF Sum-26', frequency: 'daily', chartKind: 'candlestick',
+    tags: ['gas', 'seasonal'],
+    description: 'TTF summer-2026 gas contract (Apr–Sep delivery) — the injection-season benchmark.',
+    shape: { base: 30.4, drift: -0.01, volatility: 0.024, seasonality: 0.06, floor: 6 },
+  }),
+  'eua-dec27': m({
+    id: 'eua-dec27', name: 'EUA December 2027', symbol: 'EUA DEC27', tab: 'contracts',
+    path: ['Futures', 'Monthly Rolling'], unit: 'EUR/t', currency: 'EUR',
+    source: 'ICE EUA Dec-27', frequency: 'daily', chartKind: 'candlestick',
+    tags: ['carbon', 'futures'],
+    description: 'December 2027 EU carbon allowance future — the next-year ETS benchmark.',
+    shape: { base: 74.0, drift: 0.06, volatility: 0.022, seasonality: 0.04, floor: 5 },
+  }),
+  'wti-cal26': m({
+    id: 'wti-cal26', name: 'WTI Calendar 2026', symbol: 'CL CAL26', tab: 'contracts',
+    path: ['Absolute Contracts'], unit: 'USD/bbl', currency: 'USD',
+    source: 'NYMEX WTI Cal-26', frequency: 'daily', chartKind: 'candlestick',
+    tags: ['oil', 'calendar'],
+    description: 'WTI calendar-2026 strip contract (annual average delivery).',
+    shape: { base: 74.8, drift: 0.02, volatility: 0.016, seasonality: 0.04, floor: 15 },
+  }),
+
+  // --- Extra regions ---------------------------------------------------------
+  caiso: m({
+    id: 'caiso', name: 'CAISO SP15 Power', symbol: 'SP15', tab: 'regions',
+    path: ['North America', 'United States'], unit: 'USD/MWh', currency: 'USD',
+    source: 'CAISO SP15 (reference)', frequency: 'daily', chartKind: 'line',
+    tags: ['power', 'us', 'california'],
+    description: 'CAISO SP15 day-ahead power — Southern California, deep solar-driven midday dips.',
+    shape: { base: 46.0, drift: 0.02, volatility: 0.09, seasonality: 0.16, seasonPhase: 20, floor: -15 },
+  }),
+  'des-nwe': m({
+    id: 'des-nwe', name: 'DES NWE LNG', symbol: 'NWE', tab: 'regions',
+    path: ['Europe', 'LNG'], unit: 'USD/MMBtu', currency: 'USD',
+    source: 'Platts DES NWE (reference)', frequency: 'daily', chartKind: 'area',
+    tags: ['lng', 'europe'],
+    description: 'Delivered ex-ship North-West Europe LNG — the European seaborne LNG marker vs TTF.',
+    shape: { base: 11.6, drift: -0.01, volatility: 0.035, seasonality: 0.18, seasonPhase: 200, floor: 4 },
+  }),
+};
+
+// -----------------------------------------------------------------------------
+// Leaf helper — builds a TreeNode from a series id (caption = unit).
+// -----------------------------------------------------------------------------
+function leaf(seriesId: string, labelOverride?: string): TreeNode {
+  const s = SERIES[seriesId];
+  return {
+    id: `n-${seriesId}`,
+    label: labelOverride ?? s.name,
+    caption: s.unit,
+    seriesId,
+    badge: s.status === 'forbidden' ? 'locked' : s.status === 'missing' ? 'n/a' : undefined,
+  };
+}
+
+// -----------------------------------------------------------------------------
+// TREES — one per tab. Max 10 parents each.
+// -----------------------------------------------------------------------------
+export const TREES: Record<TabId, TreeNode[]> = {
+  forecast: [
+    {
+      id: 'f-energy', label: 'Energy', icon: 'flame',
+      children: [
+        { id: 'f-crude', label: 'Crude Oil', children: [leaf('brent'), leaf('wti'), leaf('dubai')] },
+        { id: 'f-gas', label: 'Natural Gas', children: [leaf('ttf'), leaf('henryhub'), leaf('nbp'), leaf('psv'), leaf('the')] },
+        { id: 'f-refined', label: 'Refined Products', children: [leaf('gasoil'), leaf('rbob')] },
+      ],
+    },
+    {
+      id: 'f-power', label: 'Power', icon: 'zap',
+      children: [
+        {
+          id: 'f-da', label: 'Day-Ahead',
+          children: [leaf('de-power'), leaf('fr-power'), leaf('nordpool'), leaf('it-power'), leaf('es-power')],
+        },
+      ],
+    },
+    { id: 'f-carbon', label: 'Carbon', icon: 'leaf', children: [leaf('eua'), leaf('uka'), leaf('cca')] },
+    {
+      id: 'f-weather', label: 'Weather', icon: 'cloud',
+      children: [
+        { id: 'f-temp', label: 'Temperature', children: [leaf('temp-eu')] },
+        { id: 'f-dd', label: 'Degree Days', children: [leaf('hdd-us'), leaf('cdd-us')] },
+        { id: 'f-ren', label: 'Renewables', children: [leaf('wind-de'), leaf('solar-es')] },
+      ],
+    },
+    {
+      id: 'f-ag', label: 'Agriculture', icon: 'wheat',
+      children: [leaf('wheat'), leaf('corn'), leaf('soybean'), leaf('sugar')],
+    },
+    {
+      id: 'f-metals', label: 'Metals', icon: 'gem',
+      children: [
+        { id: 'f-prec', label: 'Precious', children: [leaf('gold'), leaf('silver')] },
+        { id: 'f-base', label: 'Base', children: [leaf('copper'), leaf('aluminium'), leaf('nickel')] },
+      ],
+    },
+    { id: 'f-freight', label: 'Freight', icon: 'globe', children: [leaf('baltic')] },
+  ],
+  contracts: [
+    {
+      id: 'c-abs', label: 'Absolute Contracts', icon: 'file',
+      children: [leaf('brent-fm'), leaf('ttf-cal26'), leaf('wti-cal26')],
+    },
+    {
+      id: 'c-cont', label: 'Continuous Contracts', icon: 'infinity',
+      children: [leaf('brent-c1'), leaf('wti-c1')],
+    },
+    {
+      id: 'c-fut', label: 'Futures', icon: 'calendar',
+      children: [
+        {
+          id: 'c-roll', label: 'Monthly Rolling',
+          children: [leaf('eua-dec26'), leaf('eua-dec27'), leaf('ttf-q127'), leaf('hh-jan27')],
+        },
+        { id: 'c-seas', label: 'Seasonal', children: [leaf('ttf-sum26')] },
+      ],
+    },
+    {
+      id: 'c-spread', label: 'Spreads', icon: 'git-compare',
+      children: [leaf('brent-wti-spread'), leaf('ttf-nbp-spread')],
+    },
+  ],
+  regions: [
+    {
+      id: 'r-eu', label: 'Europe', icon: 'globe',
+      children: [
+        { id: 'r-eu-power', label: 'Power', children: [leaf('de-power'), leaf('fr-power'), leaf('nordpool'), leaf('it-power'), leaf('es-power')] },
+        { id: 'r-eu-gas', label: 'Gas', children: [leaf('ttf'), leaf('nbp'), leaf('psv'), leaf('the')] },
+        { id: 'r-eu-lng', label: 'LNG', children: [leaf('des-nwe')] },
+        { id: 'r-eu-carbon', label: 'Carbon', children: [leaf('eua'), leaf('uka')] },
+      ],
+    },
+    {
+      id: 'r-na', label: 'North America', icon: 'globe',
+      children: [
+        { id: 'r-na-us', label: 'United States', children: [leaf('henryhub'), leaf('pjm'), leaf('ercot'), leaf('caiso')] },
+      ],
+    },
+    {
+      id: 'r-ap', label: 'Asia Pacific', icon: 'globe',
+      children: [{ id: 'r-ap-lng', label: 'LNG', children: [leaf('jkm')] }],
+    },
+  ],
+};
+
+export const TAB_LABELS: Record<TabId, string> = {
+  forecast: 'Forecast Series',
+  contracts: 'Contracts',
+  regions: 'Regions & Markets',
+};
+
+export const TAB_ICONS: Record<TabId, string> = {
+  forecast: 'chart-line',
+  contracts: 'file-text',
+  regions: 'globe',
+};
+
+/** Flat search across all series for a query string. */
+export function searchSeries(query: string): SeriesMeta[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return [];
+  return Object.values(SERIES).filter(
+    (s) =>
+      s.name.toLowerCase().includes(q) ||
+      s.symbol.toLowerCase().includes(q) ||
+      s.tags?.some((t) => t.includes(q)),
+  );
+}

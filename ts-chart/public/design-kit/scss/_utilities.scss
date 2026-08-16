@@ -1,0 +1,271 @@
+// Shared primitives used across components (global, token-driven).
+
+// --- Skeleton shimmer --------------------------------------------------------
+.ts-skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--ts-skeleton-base);
+  border-radius: var(--ts-radius-sm);
+}
+.ts-skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--ts-skeleton-shine),
+    transparent
+  );
+  animation: ts-shimmer 1.3s var(--ts-ease) infinite;
+}
+@keyframes ts-shimmer {
+  100% { transform: translateX(100%); }
+}
+
+// --- Mono numerals -----------------------------------------------------------
+.ts-mono {
+  font-family: var(--ts-font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+// --- Value color helpers -----------------------------------------------------
+.ts-up { color: var(--ts-up); }
+.ts-down { color: var(--ts-down); }
+.ts-muted { color: var(--ts-text-muted); }
+
+// --- Badge / pill ------------------------------------------------------------
+.ts-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ts-space-1);
+  height: 18px;
+  padding: 0 var(--ts-space-2);
+  font-size: var(--ts-fs-xxs);
+  font-weight: var(--ts-fw-semibold);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  border-radius: var(--ts-radius-pill);
+  background: var(--ts-bg-active);
+  color: var(--ts-text-secondary);
+  white-space: nowrap;
+}
+.ts-badge--accent {
+  background: var(--ts-accent-weak);
+  color: var(--ts-accent-strong);
+}
+
+// --- Divider -----------------------------------------------------------------
+.ts-divider {
+  height: 1px;
+  background: var(--ts-border-subtle);
+  border: none;
+  margin: var(--ts-space-2) 0;
+}
+
+// --- Truncation --------------------------------------------------------------
+.ts-truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+// --- angular-split gutter theming (global; component styles are encapsulated)
+// angular-split paints a light dotted grip via an inline background-image on the
+// gutter element — kill it (needs !important) and draw our own themed grip.
+as-split-gutter,
+as-split .as-split-gutter {
+  background-color: var(--ts-bg) !important;
+  background-image: none !important;
+  transition: background-color var(--ts-dur-1) var(--ts-ease);
+  position: relative;
+}
+// hide the injected dots icon child, if any
+as-split-gutter > *,
+as-split .as-split-gutter-icon {
+  background: none !important;
+  opacity: 0;
+}
+as-split-gutter::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  margin: auto;
+}
+as-split-gutter:hover,
+as-split-gutter.as-dragged {
+  background-color: var(--ts-accent-weak) !important;
+}
+// vertical gutter grip (horizontal split -> vertical gutter line)
+.as-horizontal > as-split-gutter {
+  cursor: col-resize;
+}
+.as-horizontal > as-split-gutter::after {
+  width: 1px;
+  height: 100%;
+  background: var(--ts-border);
+  transition: background var(--ts-dur-1) var(--ts-ease), width var(--ts-dur-1) var(--ts-ease);
+}
+.as-horizontal > as-split-gutter:hover::after,
+.as-horizontal > as-split-gutter.as-dragged::after {
+  background: var(--ts-accent);
+  width: 2px;
+}
+
+// --- Icon button -------------------------------------------------------------
+.ts-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--ts-radius-sm);
+  color: var(--ts-text-secondary);
+  cursor: pointer;
+  transition: background var(--ts-dur-1) var(--ts-ease),
+    color var(--ts-dur-1) var(--ts-ease), transform var(--ts-dur-1) var(--ts-ease);
+}
+.ts-icon-btn:hover {
+  background: var(--ts-bg-hover);
+  color: var(--ts-text-bright);
+}
+.ts-icon-btn:active {
+  transform: scale(0.92);
+}
+.ts-icon-btn.is-active {
+  background: var(--ts-accent-weak);
+  color: var(--ts-accent-strong);
+}
+.ts-icon-btn:disabled {
+  color: var(--ts-text-faint);
+  cursor: not-allowed;
+  background: none;
+  opacity: 0.45;
+}
+.ts-icon-btn lucide-icon {
+  display: inline-flex;
+}
+
+// --- Text button -------------------------------------------------------------
+.ts-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ts-space-2);
+  height: 30px;
+  padding: 0 var(--ts-space-3);
+  border-radius: var(--ts-radius-sm);
+  font-size: var(--ts-fs-sm);
+  font-weight: var(--ts-fw-medium);
+  color: var(--ts-text-secondary);
+  border: 1px solid var(--ts-border);
+  background: var(--ts-bg-elevated);
+  cursor: pointer;
+  transition: all var(--ts-dur-1) var(--ts-ease);
+}
+.ts-btn:hover {
+  border-color: var(--ts-border-strong);
+  color: var(--ts-text-bright);
+  background: var(--ts-bg-hover);
+}
+.ts-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.ts-btn--primary {
+  background: var(--ts-accent);
+  border-color: var(--ts-accent);
+  color: var(--ts-accent-contrast);
+}
+.ts-btn--primary:hover {
+  background: var(--ts-accent-strong);
+  border-color: var(--ts-accent-strong);
+  color: var(--ts-accent-contrast);
+}
+
+// --- Segmented control -------------------------------------------------------
+.ts-segmented {
+  display: inline-flex;
+  padding: 2px;
+  gap: 2px;
+  border-radius: var(--ts-radius-md);
+  background: var(--ts-bg-inset);
+  border: 1px solid var(--ts-border-subtle);
+}
+.ts-segmented button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ts-space-1);
+  height: 24px;
+  padding: 0 var(--ts-space-3);
+  border-radius: var(--ts-radius-sm);
+  font-size: var(--ts-fs-xs);
+  font-weight: var(--ts-fw-medium);
+  color: var(--ts-text-muted);
+  cursor: pointer;
+  transition: all var(--ts-dur-1) var(--ts-ease);
+}
+.ts-segmented button:hover {
+  color: var(--ts-text-bright);
+}
+.ts-segmented button.is-active {
+  background: var(--ts-bg-active);
+  color: var(--ts-text-bright);
+  box-shadow: var(--ts-shadow-1);
+}
+.ts-segmented button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+/* A .dim container already fades everything inside — never double-fade. */
+.dim button:disabled {
+  opacity: 1;
+}
+
+// --- Panel / card ------------------------------------------------------------
+.ts-panel {
+  background: var(--ts-bg-elevated);
+  border: 1px solid var(--ts-border);
+  border-radius: var(--ts-radius-lg);
+  overflow: hidden;
+}
+
+// --- Empty / error state -----------------------------------------------------
+.ts-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ts-space-4);
+  height: 100%;
+  padding: var(--ts-space-8);
+  text-align: center;
+}
+.ts-empty img,
+.ts-empty svg {
+  max-width: min(420px, 70%);
+  height: auto;
+  opacity: 0.9;
+}
+.ts-empty h3 {
+  font-size: var(--ts-fs-lg);
+  font-weight: var(--ts-fw-semibold);
+  color: var(--ts-text-bright);
+}
+.ts-empty p {
+  font-size: var(--ts-fs-sm);
+  color: var(--ts-text-muted);
+  max-width: 42ch;
+}
+
+// --- CDK overlay base --------------------------------------------------------
+.cdk-overlay-container {
+  z-index: var(--ts-z-overlay);
+}
+.cdk-overlay-backdrop.ts-backdrop {
+  background: var(--ts-bg-scrim);
+  backdrop-filter: blur(2px);
+}
+
