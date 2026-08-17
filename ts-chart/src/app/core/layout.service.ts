@@ -4,6 +4,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { map } from 'rxjs';
 
 const SIZES_KEY = 'tschart.panelSizes';
+const DOCK_KEY = 'tschart.dock';
 
 export type Viewport = 'large' | 'medium' | 'small';
 
@@ -13,7 +14,15 @@ interface PanelSizes {
   right: number;
 }
 
+interface DockState {
+  /** Left dock (tree/search). Persisted; OPEN by default — the tree is a primary driver. */
+  leftCollapsed: boolean;
+  /** Right inspector. Persisted; CLOSED by default. */
+  rightCollapsed: boolean;
+}
+
 const DEFAULT_SIZES: PanelSizes = { left: 22, center: 56, right: 22 };
+const DEFAULT_DOCK: DockState = { leftCollapsed: false, rightCollapsed: true };
 
 /**
  * Layout state: panel collapse, panel sizes (persisted), responsive viewport,
@@ -24,12 +33,14 @@ export class LayoutService {
   private readonly bp = inject(BreakpointObserver);
 
   /**
-   * Chart-first layout: both side surfaces are transient overlays, CLOSED by
-   * default. "Collapsed" = drawer closed. Left = browse drawer (tree/search),
-   * right = series inspector.
+   * Chart-first layout with persistent chrome: the left tree is a DOCK (in-flow,
+   * open by default — a primary driver of the app), the right inspector is a
+   * non-modal dock (closed by default). Neither veils the chart; "collapsed" =
+   * dock hidden. State persists across reloads.
    */
-  readonly leftCollapsed = signal(true);
-  readonly rightCollapsed = signal(true);
+  private readonly dock0 = this.readDock();
+  readonly leftCollapsed = signal(this.dock0.leftCollapsed);
+  readonly rightCollapsed = signal(this.dock0.rightCollapsed);
   readonly sizes = signal<PanelSizes>(this.readSizes());
 
   /** Responsive viewport bucket derived from CDK BreakpointObserver. */
@@ -50,6 +61,13 @@ export class LayoutService {
   constructor() {
     effect(() => {
       localStorage.setItem(SIZES_KEY, JSON.stringify(this.sizes()));
+    });
+    effect(() => {
+      const dock: DockState = {
+        leftCollapsed: this.leftCollapsed(),
+        rightCollapsed: this.rightCollapsed(),
+      };
+      localStorage.setItem(DOCK_KEY, JSON.stringify(dock));
     });
   }
 
@@ -84,5 +102,15 @@ export class LayoutService {
       /* ignore */
     }
     return { ...DEFAULT_SIZES };
+  }
+
+  private readDock(): DockState {
+    try {
+      const raw = localStorage.getItem(DOCK_KEY);
+      if (raw) return { ...DEFAULT_DOCK, ...JSON.parse(raw) };
+    } catch {
+      /* ignore */
+    }
+    return { ...DEFAULT_DOCK };
   }
 }

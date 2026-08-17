@@ -60,6 +60,16 @@ import { TooltipDirective } from '../../core/tooltip.directive';
           <lucide-icon class="folder-ico" [name]="node().icon!" [size]="15" />
         }
         <span class="label ts-truncate">{{ node().label }}</span>
+        <!-- Collapsed group with active selections underneath: surface it so a
+             hidden selection is never invisible. -->
+        @if (!expanded() && selectedInside() > 0) {
+          <span
+            class="sel-badge ts-mono"
+            [tsTooltip]="selectedInside() + ' selected in this group'"
+          >
+            {{ selectedInside() }}
+          </span>
+        }
         <span class="count">{{ leafCount() }}</span>
       </button>
 
@@ -120,6 +130,20 @@ import { TooltipDirective } from '../../core/tooltip.directive';
         font-size: var(--ts-fs-xxs);
         color: var(--ts-text-faint);
         font-variant-numeric: tabular-nums;
+      }
+      .sel-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 16px;
+        height: 15px;
+        padding: 0 5px;
+        border-radius: var(--ts-radius-pill);
+        background: var(--ts-accent-weak);
+        color: var(--ts-accent-strong);
+        font-size: var(--ts-fs-xxs);
+        font-weight: var(--ts-fw-bold);
+        flex: none;
       }
       /* Leaf */
       .leaf {
@@ -208,6 +232,15 @@ export class TreeNodeComponent {
 
   readonly leafCount = computed(() => countLeaves(this.node()));
 
+  /** How many series under this (collapsed) parent are currently selected. */
+  readonly selectedInside = computed(() => {
+    if (this.isLeaf()) return 0;
+    const sel = new Set(this.selection.selectedIds());
+    let n = 0;
+    for (const id of seriesIdsIn(this.node())) if (sel.has(id)) n++;
+    return n;
+  });
+
   selectLeaf(): void {
     const id = this.node().seriesId;
     if (id) this.selection.toggle(id);
@@ -217,4 +250,10 @@ export class TreeNodeComponent {
 function countLeaves(node: TreeNode): number {
   if (!node.children?.length) return 1;
   return node.children.reduce((n, c) => n + countLeaves(c), 0);
+}
+
+/** All series ids under a node (leaves only). */
+function seriesIdsIn(node: TreeNode): string[] {
+  if (!node.children?.length) return node.seriesId ? [node.seriesId] : [];
+  return node.children.flatMap(seriesIdsIn);
 }

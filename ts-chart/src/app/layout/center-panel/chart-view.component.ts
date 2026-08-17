@@ -28,6 +28,7 @@ import {
   Time,
 } from 'lightweight-charts';
 import { ChartedSeries, ChartMode, ChartType } from '../../data/models';
+import { sanitizePoints } from '../../data/sanitize';
 import {
   CurvePoint,
   generateAsOf,
@@ -69,6 +70,8 @@ interface ValueTag {
   y: number;
   value: number;
   color: string;
+  /** Series symbol — the authoritative identifier at high series counts. */
+  label: string;
 }
 
 type Point = { time: string; value: number };
@@ -215,10 +218,13 @@ const SERIES_DEF: Record<SeriesType, SeriesDefinition<SeriesType>> = {
       </div>
       }
 
-      <!-- Right-edge per-series value tags -->
+      <!-- Right-edge per-series identity labels (symbol + value) — the
+           authoritative way to tell many lines apart; solid lines don't scale
+           on hue alone past the palette core. -->
       @for (tag of valueTags(); track $index) {
         <div class="lastval ts-mono" [style.top.px]="tag.y" [style.background]="tag.color">
-          {{ fmt(tag.value) }}
+          <span class="lastval__sym">{{ tag.label }}</span>
+          <span class="lastval__val">{{ fmt(tag.value) }}</span>
         </div>
       }
 
@@ -542,6 +548,10 @@ const SERIES_DEF: Record<SeriesType, SeriesDefinition<SeriesType>> = {
         position: absolute;
         right: 2px;
         z-index: 5;
+        display: inline-flex;
+        align-items: baseline;
+        gap: var(--ts-space-1);
+        max-width: 40%;
         transform: translateY(-50%);
         padding: 1px var(--ts-space-2);
         border-radius: var(--ts-radius-xs);
@@ -550,6 +560,17 @@ const SERIES_DEF: Record<SeriesType, SeriesDefinition<SeriesType>> = {
         font-weight: var(--ts-fw-bold);
         box-shadow: var(--ts-shadow-1);
         pointer-events: none;
+      }
+      .lastval__sym {
+        font-weight: var(--ts-fw-bold);
+        opacity: 0.85;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .lastval__val {
+        font-variant-numeric: tabular-nums;
+        flex: none;
       }
       .today {
         position: absolute;
@@ -598,10 +619,13 @@ const SERIES_DEF: Record<SeriesType, SeriesDefinition<SeriesType>> = {
         white-space: nowrap;
         pointer-events: none;
       }
+      /* Bottom-LEFT, raised clear of the time axis: the right edge belongs to
+         the price-axis values + per-series identity labels — controls must
+         never occlude them (obs: fit button hid axis text). */
       .zoom {
         position: absolute;
-        right: var(--ts-space-2);
-        bottom: 34px;
+        left: var(--ts-space-2);
+        bottom: 30px;
         z-index: 5;
         display: inline-flex;
         gap: 1px;
@@ -760,8 +784,12 @@ export class ChartViewComponent implements OnDestroy {
     // touch signals that change row values so the computed re-runs
     this.valueTags();
     const mode = this.mode();
+    // While the crosshair is active, the readout must reflect the hovered
+    // timestamp — a series with no point there shows "—", never a stale
+    // carry-forward from lastVals (Bloomberg-grade: no phantom values).
+    const hovering = this.hoverDate() !== null;
     return this.series().map((s) => {
-      const value = hv[s.id] ?? this.lastVals[s.id] ?? null;
+      const value = hovering ? (hv[s.id] ?? null) : (this.lastVals[s.id] ?? null);
       const prev = this.prevVals[s.id];
       const delta = showDelta && value != null && prev != null ? value - prev : null;
       return {
@@ -905,6 +933,21 @@ export class ChartViewComponent implements OnDestroy {
         rightOffset: 4,
         fixLeftEdge: true,
       },
+      // Wheel zoom anchors on the data point under the cursor (TradingView-style
+      // ⌘/ctrl+wheel behaviour): the cursor's time stays fixed, only the range
+      // around it expands/contracts. The +/− buttons zoom around centre.
+      handleScale: {
+        mouseWheel: true,
+        pinch: true,
+        axisPressedMouseMove: true,
+        axisDoubleClickReset: true,
+      },
+      handleScroll: {
+        mouseWheel: true,
+        pressedMouseMove: true,
+        horzTouchDrag: true,
+        vertTouchDrag: false,
+      },
       crosshair: {
         mode: CrosshairMode.Normal,
         vertLine: {
@@ -969,13 +1012,16 @@ export class ChartViewComponent implements OnDestroy {
     const next: ActiveSeries[] = [];
     let added = false;
     for (const spec of specs) {
+      // Hygiene at the chart boundary: only clean, sorted, de-duped points
+      // reach lightweight-charts (a real feed can carry null/NaN/gaps).
+      const data = sanitizePoints(spec.data as readonly { time: string }[]);
       let a = existing.get(spec.key);
       if (!a) {
         const api = chart.addSeries(
           SERIES_DEF[spec.type],
           spec.options as never,
         ) as ISeriesApi<SeriesType>;
-        api.setData(spec.data as never);
+        api.setData(data as never);
         a = {
           key: spec.key,
           legendId: spec.legendId,
@@ -984,12 +1030,12 @@ export class ChartViewComponent implements OnDestroy {
           color: spec.color,
           last: spec.last,
           track: spec.track,
-          dataRef: spec.data,
+          dataRef: data,
         };
         added = true;
-      } else if (a.dataRef !== spec.data) {
-        a.api.setData(spec.data as never);
-        a.dataRef = spec.data;
+      } else if (a.dataRef !== data) {
+        a.api.setData(data as never);
+        a.dataRef = data;
       }
       // Recolor survivors in place (theme toggle / slot reassignment).
       if (a.color !== spec.color) a.api.applyOptions(spec.options as never);
@@ -1387,11 +1433,19 @@ export class ChartViewComponent implements OnDestroy {
       const x = chart.timeScale().timeToCoordinate(this.markerTime as Time);
       this.markerX.set(x === null ? null : Math.round(x));
     }
+    const symOf = new Map(this.series().map((s) => [s.id, s.symbol]));
     const tags: ValueTag[] = [];
     for (const a of this.active) {
       if (!a.track) continue;
       const y = a.api.priceToCoordinate(a.last);
-      if (y !== null) tags.push({ y: Math.round(y), value: a.last, color: a.color });
+      if (y !== null) {
+        tags.push({
+          y: Math.round(y),
+          value: a.last,
+          color: a.color,
+          label: symOf.get(a.legendId) ?? '',
+        });
+      }
     }
     // De-overlap: sweep down enforcing a 16px gap, then clamp to the host so
     // near-equal last values (spread trades!) stay individually legible.

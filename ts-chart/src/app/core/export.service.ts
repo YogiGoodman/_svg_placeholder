@@ -6,6 +6,7 @@ const KIT_FILES = [
   'AGENTS.md',
   'DESIGN_GUIDE.md',
   'CHART_STYLE_GUIDE.md',
+  'UX_ENGINEERING_PLAYBOOK.md',
   'WORKSPACE_PERSISTENCE.md',
   'scss/_tokens.scss',
   'scss/_utilities.scss',

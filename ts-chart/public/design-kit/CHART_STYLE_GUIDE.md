@@ -232,3 +232,38 @@ Keep the same `IChartApi` instance — never destroy the chart just to recolor i
 - [ ] Re-theme via `applyOptions` + series recreate, one chart instance.
 - [ ] `autoSize` + overlay reposition on resize.
 - [ ] Empty/error/loading states before the chart ever mounts.
+- [ ] Points pass `sanitizePoints` before `setData` (no null/NaN/dupes throw).
+- [ ] Lines solid; identity via right-edge symbol+value labels.
+- [ ] Crosshair readout = hovered timestamp only, `—` when a series has no point.
+- [ ] Wheel/pinch zoom anchors on the cursor's data point.
+
+## 9. Scale & resilience (round 10)
+
+**Right-edge identity labels.** The per-series value tags carry **symbol + value**
+(`ValueTag { y, value, color, label }`, rendered as `.lastval` with `__sym` +
+`__val`). They are de-overlapped (16px sweep + host clamp) and are the authoritative
+identifier past the palette core. Populate `label` from a `series() → symbol` map in
+`updateOverlays()`. Lines stay solid (`LineStyle.Solid`); dash is semantic only.
+
+**Data hygiene at the boundary.** Every point array passes `sanitizePoints`
+(`src/app/data/sanitize.ts`) immediately before `api.setData` in `render()`: drops
+null/undefined/NaN and malformed dates, sorts ascending, dedupes timestamps. It is
+**memoized by input identity** so repeat renders return the same cleaned reference —
+that preserves the survivor `dataRef !== data` diff (no re-`setData`, no flicker).
+lightweight-charts throws on nulls/dupes/out-of-order; this guarantees it never sees
+them. Zero drawables still routes to the in-chart notice — never a silent blank.
+
+**Missing-data readouts.** `legendRows` reads a `hovering = hoverDate() !== null`
+guard: while the crosshair is active a series with no point on that date resolves to
+`null` → `formatValue` renders `—`; `lastVals` (latest known) is used **only** at
+idle. The hover card (`cardRows`) already filters `value != null`. No carry-forward.
+
+**Anchored zoom.** `buildChart` sets `handleScale.mouseWheel` + `pinch` and
+`handleScroll.mouseWheel` explicitly; wheel/pinch zoom keeps the time under the
+cursor fixed (TradingView ⌘/ctrl+wheel feel). The `.zoom` +/− buttons zoom around
+centre and sit **bottom-left, raised above the time axis** — the right edge is
+reserved for price-axis values + identity labels and controls must not occlude them.
+
+**Multi-field observations (target).** OHLC/bid-ask series show one field per series
+in compare; per-field chips only when a single/few series are focused. See
+`DESIGN_GUIDE.md` §7.4.

@@ -7,9 +7,12 @@ import { ChartPanelComponent } from '../center-panel/chart-panel.component';
 import { InfoPanelComponent } from '../right-panel/info-panel.component';
 
 /**
- * Chart-first shell: a slim icon rail + the chart card. Selection (tree/search)
- * and series details are TRANSIENT overlays, not permanent panels — the chart
- * owns the pixels; chrome appears on demand and leaves on Esc/scrim.
+ * Chart-first shell: a slim icon rail + docked chrome + the chart card. The tree
+ * is a PERSISTENT left dock (open by default — a primary driver); series details
+ * are a non-modal right dock. Docks sit in normal flow so the chart flexes beside
+ * them and is NEVER veiled — no scrim, no blur (fails trading-desk review). On
+ * small screens docks collapse to fixed overlays. Rail owns toggling; each dock
+ * also carries its own close control.
  */
 @Component({
   selector: 'app-workspace',
@@ -24,7 +27,7 @@ import { InfoPanelComponent } from '../right-panel/info-panel.component';
   ],
   template: `
     <div class="shell">
-      <!-- Icon rail: the browse entry point (⌘K is the fast path) -->
+      <!-- Icon rail: single toggle owner for both docks (⌘K is the fast path) -->
       <nav class="rail">
         <button
           class="rail__btn"
@@ -46,23 +49,21 @@ import { InfoPanelComponent } from '../right-panel/info-panel.component';
         </button>
       </nav>
 
+      <!-- Left dock: tree + search (persistent, in-flow) -->
+      @if (!layout.leftCollapsed()) {
+        <aside class="dock dock--left">
+          <app-left-panel (close)="layout.toggleLeft()" />
+        </aside>
+      }
+
       <div class="center">
         <app-chart-panel />
       </div>
 
-      <!-- Browse drawer (tree + search) -->
-      @if (!layout.leftCollapsed()) {
-        <div class="scrim" (click)="layout.toggleLeft()"></div>
-        <aside class="drawer drawer--left">
-          <app-left-panel />
-        </aside>
-      }
-
-      <!-- Series inspector -->
+      <!-- Right dock: series inspector (non-modal, in-flow) -->
       @if (!layout.rightCollapsed()) {
-        <div class="scrim" (click)="layout.toggleRight()"></div>
-        <aside class="drawer drawer--right">
-          <app-info-panel />
+        <aside class="dock dock--right">
+          <app-info-panel (close)="layout.toggleRight()" />
         </aside>
       }
     </div>
@@ -118,51 +119,49 @@ import { InfoPanelComponent } from '../right-panel/info-panel.component';
         min-width: 0;
         min-height: 0;
       }
-      .scrim {
-        position: fixed;
-        inset: var(--ts-toolbar-h) 0 0 0;
-        z-index: var(--ts-z-drawer);
-        background: var(--ts-bg-scrim);
-        backdrop-filter: blur(2px);
-        animation: fade var(--ts-dur-2) var(--ts-ease);
-      }
-      .drawer {
-        position: fixed;
-        top: var(--ts-toolbar-h);
-        bottom: 0;
-        z-index: calc(var(--ts-z-drawer) + 1);
-        width: min(86vw, 340px);
+      /* In-flow docks: the chart flexes beside them, never under them. */
+      .dock {
+        flex: none;
+        width: min(340px, 32vw);
+        min-height: 0;
         background: var(--ts-bg-elevated);
-        box-shadow: var(--ts-shadow-3);
+        overflow: hidden;
       }
-      .drawer--left {
-        left: 48px;
+      .dock--left {
         border-right: 1px solid var(--ts-border);
-        animation: slideL var(--ts-dur-3) var(--ts-ease-out);
+        animation: slideL var(--ts-dur-2) var(--ts-ease-out);
       }
-      .drawer--right {
-        right: 0;
+      .dock--right {
         border-left: 1px solid var(--ts-border);
-        animation: slideR var(--ts-dur-3) var(--ts-ease-out);
+        animation: slideR var(--ts-dur-2) var(--ts-ease-out);
       }
+      /* Small screens: docks collapse to fixed overlays (no scrim, no blur). */
       @media (max-width: 767px) {
-        .drawer--left {
-          left: 0;
+        .dock {
+          position: fixed;
+          top: var(--ts-toolbar-h);
+          bottom: 0;
+          z-index: calc(var(--ts-z-drawer) + 1);
+          width: min(86vw, 340px);
+          box-shadow: var(--ts-shadow-3);
         }
-      }
-      @keyframes fade {
-        from {
-          opacity: 0;
+        .dock--left {
+          left: 48px;
+        }
+        .dock--right {
+          right: 0;
         }
       }
       @keyframes slideL {
         from {
-          transform: translateX(-100%);
+          transform: translateX(-12px);
+          opacity: 0;
         }
       }
       @keyframes slideR {
         from {
-          transform: translateX(100%);
+          transform: translateX(12px);
+          opacity: 0;
         }
       }
     `,
@@ -173,8 +172,11 @@ export class WorkspaceComponent {
 
   @HostListener('window:keydown.escape')
   onEscape(): void {
-    if (!this.layout.leftCollapsed() || !this.layout.rightCollapsed()) {
-      this.layout.closeDrawers();
+    // Progressive dismiss: transient inspector first, then the tree dock.
+    if (!this.layout.rightCollapsed()) {
+      this.layout.toggleRight();
+    } else if (!this.layout.leftCollapsed()) {
+      this.layout.toggleLeft();
     }
   }
 }

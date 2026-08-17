@@ -256,3 +256,45 @@ trader trust per unit of effort.
    `.ts-segmented`, `.ts-panel`, `.ts-empty`, `.ts-skeleton`) before writing CSS.
 3. Never introduce a raw hex in a component — add a token instead.
 4. For charts, see `CHART_STYLE_GUIDE.md`.
+
+## 7. Series identity & observations at scale (round 10)
+
+A comparison view can hold **20–30 series** at once. Design rules for keeping that
+legible — validated against capital.com's 30-series compare:
+
+**7.1 Palette.** `SeriesColorService` holds a **24-slot** OKLCh-normalized
+dual-theme palette: a 12-hue maximally-separated core plus 12 finer fills. A slot
+is assigned in selection order and is **stable for the series' whole lifetime on
+the chart** — the same color shows in the tree dot, legend swatch, inspector
+swatch, and right-edge label. Past ~24 series hues repeat; that is acceptable
+because the label (below) is the real identifier.
+
+**7.2 The right-edge label is the identifier — not the line color.** Each tracked
+series gets a colored pill at the right edge carrying **symbol + value**,
+vertically de-overlapped and sorted. At high N you identify a series by reading
+these labels, not by tracing a hue through a tangle of lines. Lines are **always
+solid**; dash/dot is reserved for *semantic* distinctions (forecast vs actual,
+data vintage) and must never be spent on identity.
+
+**7.3 Many-series compare uses a normalized %-change axis.** Absolute scales for
+mixed-unit instruments (EUR/MWh, USD/bbl, index points) share no axis. For a
+many-series overlay, normalize each series to **% change from the window start**
+so one axis is honest for all. Absolute mode stays for one or few same-unit series.
+
+**7.4 Observations (multi-field series).** Some series carry several fields per
+timestamp — OHLC (open/high/low/close), bid/ask. Rules:
+
+- In a **compare** (many-series) view, show **one field per series** (default
+  close). Never expand to N series × M fields — 12 × 4 = 48 lines is an unreadable
+  mat.
+- Per-field **toggle chips** (O · H · L · C) appear only when a **single or few
+  series are focused**. Color stays per-series; the *field* is distinguished
+  *within* that focused series' view (weight/opacity or a candle), not as new
+  top-level colors.
+- The right-edge label names the tracked field when it is not the default.
+- Legend/axis follow the same one-field-per-series rule; the focused-series chips
+  drive a secondary, scoped readout.
+
+*(7.3 normalized axis and 7.4 chips are the specified target; the round-10 change
+shipped the 24-slot palette, right-edge identity labels, the solid-line rule, and
+the data-resilience foundations they build on.)*

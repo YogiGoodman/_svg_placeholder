@@ -3,6 +3,7 @@ import {
   Component,
   computed,
   inject,
+  output,
   signal,
 } from '@angular/core';
 import { LucideAngularModule } from 'lucide-angular';
@@ -16,7 +17,6 @@ import {
 } from '../../data/series-catalog.data';
 import { SelectionService } from '../../core/selection.service';
 import { SeriesColorService } from '../../core/series-color.service';
-import { LayoutService } from '../../core/layout.service';
 import { TooltipDirective } from '../../core/tooltip.directive';
 import { TreeNodeComponent } from './tree-node.component';
 
@@ -34,6 +34,19 @@ const TAB_SHORT: Record<TabId, string> = {
   imports: [LucideAngularModule, TooltipDirective, TreeNodeComponent],
   template: `
     <section class="panel">
+      <!-- Dock header: title + own dismiss (mirrors the rail toggle) -->
+      <header class="phead">
+        <span>Browse</span>
+        <button
+          class="ts-icon-btn phead__close"
+          (click)="close.emit()"
+          tsTooltip="Hide panel (⌘/)"
+          aria-label="Hide browse panel"
+        >
+          <lucide-icon name="x" [size]="15" />
+        </button>
+      </header>
+
       <!-- Tab bar -->
       <div class="tabs" role="tablist">
         @for (t of tabs; track t) {
@@ -143,6 +156,23 @@ const TAB_SHORT: Record<TabId, string> = {
       }
       .panel {
         background: var(--ts-bg-elevated);
+      }
+      /* Dock header */
+      .phead {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        height: var(--ts-tabbar-h);
+        padding: 0 var(--ts-space-2) 0 var(--ts-space-4);
+        border-bottom: 1px solid var(--ts-border);
+        font-size: var(--ts-fs-sm);
+        font-weight: var(--ts-fw-semibold);
+        color: var(--ts-text-bright);
+      }
+      .phead__close {
+        width: 26px;
+        height: 26px;
+        flex: none;
       }
       /* Tabs */
       .tabs {
@@ -324,7 +354,9 @@ const TAB_SHORT: Record<TabId, string> = {
 export class LeftPanelComponent {
   readonly selection = inject(SelectionService);
   readonly colors = inject(SeriesColorService);
-  private readonly layout = inject(LayoutService);
+
+  /** Emitted when the dock's own close control is used (rail mirrors this). */
+  readonly close = output<void>();
 
   readonly tabs: TabId[] = ['forecast', 'contracts', 'regions'];
   readonly labels = TAB_LABELS;

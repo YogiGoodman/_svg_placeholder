@@ -12,6 +12,13 @@ interface PaletteEntry {
  * perceptual lightness/chroma (dark L≈0.76, light L≈0.55, C≈0.125), hue
  * rotated for max separation — no series shouts, none recedes, none is
  * confusable with chrome grays. Slot 0 is blue (accent kinship).
+ *
+ * Slots 0–11 are the maximally-separated core (typical desk use). Slots 12–23
+ * fill the hue wheel at finer intervals for high-N comparison (up to ~24
+ * distinct series). Past the core, hue alone no longer guarantees telling two
+ * lines apart — the authoritative identifier is the right-edge colored
+ * name/value label (see chart-view value tags). Lines stay SOLID always; dash
+ * styles are reserved for semantic meaning (forecast/vintage), never identity.
  */
 export const SERIES_PALETTE: PaletteEntry[] = [
   { dark: '#67b9fb', light: '#1f77b5' }, // blue
@@ -26,6 +33,18 @@ export const SERIES_PALETTE: PaletteEntry[] = [
   { dark: '#a7bd5d', light: '#697b10' }, // lime
   { dark: '#cab049', light: '#896f00' }, // gold
   { dark: '#9aaaff', light: '#5d69ba' }, // violet
+  { dark: '#4fc3e8', light: '#0d7ea3' }, // sky
+  { dark: '#e2b15a', light: '#8a6410' }, // honey
+  { dark: '#8fd07a', light: '#4f8a2e' }, // fern
+  { dark: '#d29bec', light: '#8452a6' }, // orchid
+  { dark: '#f2857e', light: '#b24a45' }, // salmon
+  { dark: '#5bcfb0', light: '#0c8a70' }, // mint
+  { dark: '#eb90bd', light: '#a8507e' }, // rose
+  { dark: '#e6a955', light: '#9c6412' }, // caramel
+  { dark: '#6fb6e0', light: '#2f6f9a' }, // steel
+  { dark: '#c0c063', light: '#7a7a18' }, // olive
+  { dark: '#b7a3ee', light: '#6a58b0' }, // periwinkle
+  { dark: '#e58fa0', light: '#a85062' }, // dusk-rose
 ];
 
 const FALLBACK: Record<Theme, string> = { dark: '#67b9fb', light: '#1f77b5' };

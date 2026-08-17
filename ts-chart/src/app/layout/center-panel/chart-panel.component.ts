@@ -60,9 +60,11 @@ const LAYOUTS: { id: ChartLayout; label: string; icon: string }[] = [
                 {{ fmtV(st.last) }}
                 <span class="strip__unit">{{ st.unit }}</span>
               </span>
-              @if (st.hoverDate) {
-                <span class="strip__date">@ {{ fmtD(st.hoverDate) }}</span>
-              }
+              <!-- Slot always reserved (fixed width) so hovering a date never
+                   shoves the change/range values sideways. -->
+              <span class="strip__date">
+                @if (st.hoverDate) {@ {{ fmtD(st.hoverDate) }}}
+              </span>
               <span
                 class="strip__chg"
                 [class.ts-up]="st.delta >= 0"
@@ -377,7 +379,9 @@ const LAYOUTS: { id: ChartLayout; label: string; icon: string }[] = [
       <!-- Status footer: provenance lives at the bottom, terminal-style -->
       <footer class="cfoot ts-mono">
         @if (primary(); as p) {
-          <span class="cfoot__src ts-truncate">{{ p.source }}</span>
+          <!-- Full provenance of the primary series: which symbol, from where,
+               at what cadence — a lone source string carried no context. -->
+          <span class="cfoot__src ts-truncate">{{ p.symbol }} · {{ p.source }} · {{ p.frequency }}</span>
           <span class="cfoot__dot">·</span>
         }
         <span>as of {{ fmtD(today) }}</span>
@@ -473,6 +477,9 @@ const LAYOUTS: { id: ChartLayout; label: string; icon: string }[] = [
         font-size: var(--ts-fs-xs);
         color: var(--ts-highlight);
         font-variant-numeric: tabular-nums;
+        min-width: 8ch;
+        flex: none;
+        white-space: nowrap;
       }
       @media (max-width: 767px) {
         .strip {

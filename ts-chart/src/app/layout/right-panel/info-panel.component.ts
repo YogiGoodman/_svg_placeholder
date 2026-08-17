@@ -3,6 +3,7 @@ import {
   Component,
   computed,
   inject,
+  output,
 } from '@angular/core';
 import { LucideAngularModule } from 'lucide-angular';
 import { SelectionService } from '../../core/selection.service';
@@ -34,6 +35,15 @@ interface SeriesCard {
         @if (sel.count() > 0) {
           <span class="ts-badge">{{ sel.count() }}</span>
         }
+        <span class="phead__spacer"></span>
+        <button
+          class="ts-icon-btn phead__close"
+          (click)="close.emit()"
+          tsTooltip="Hide panel (⌘.)"
+          aria-label="Hide details panel"
+        >
+          <lucide-icon name="x" [size]="15" />
+        </button>
       </header>
 
       <div class="scroll">
@@ -106,6 +116,14 @@ interface SeriesCard {
         font-size: var(--ts-fs-sm);
         font-weight: var(--ts-fw-semibold);
         color: var(--ts-text-bright);
+      }
+      .phead__spacer {
+        flex: 1;
+      }
+      .phead__close {
+        width: 26px;
+        height: 26px;
+        flex: none;
       }
       .hdr {
         display: inline-flex;
@@ -212,6 +230,9 @@ interface SeriesCard {
 })
 export class InfoPanelComponent {
   readonly sel = inject(SelectionService);
+
+  /** Emitted when the dock's own close control is used (rail mirrors this). */
+  readonly close = output<void>();
 
   readonly cards = computed<SeriesCard[]>(() =>
     this.sel.selected().map((meta) => {

@@ -12,6 +12,8 @@ design-kit/
   AGENTS.md              ← you are here (how to consume the kit)
   DESIGN_GUIDE.md        ← full design system: color, type, spacing, components, states
   CHART_STYLE_GUIDE.md   ← lightweight-charts v5 styling + chart-mode semantics
+  UX_ENGINEERING_PLAYBOOK.md ← 30 transferable trader-facing UX/eng principles + failure log
+  WORKSPACE_PERSISTENCE.md   ← workspace state: localStorage now, backend design at scale
   scss/
     _tokens.scss         ← all design tokens (dark + light), :root & [data-theme]
     _utilities.scss      ← reusable classes (.ts-btn, .ts-segmented, .ts-badge, …)

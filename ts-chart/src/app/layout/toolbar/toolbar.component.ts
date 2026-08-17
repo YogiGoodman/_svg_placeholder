@@ -2,7 +2,6 @@ import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { OverlayModule } from '@angular/cdk/overlay';
 import { LucideAngularModule } from 'lucide-angular';
 import { ThemeService } from '../../core/theme.service';
-import { LayoutService } from '../../core/layout.service';
 import { TooltipDirective } from '../../core/tooltip.directive';
 import { UserMenuComponent } from './user-menu.component';
 
@@ -15,18 +14,8 @@ export const APP_VERSION = '0.1.0';
   imports: [OverlayModule, LucideAngularModule, TooltipDirective, UserMenuComponent],
   template: `
     <header class="toolbar">
-      <!-- Left cluster -->
+      <!-- Left cluster — panel toggles live on the rail, not here (no duplication) -->
       <div class="cluster">
-        <button
-          class="ts-icon-btn"
-          [class.is-active]="!layout.leftCollapsed()"
-          (click)="layout.toggleLeft()"
-          [attr.aria-pressed]="!layout.leftCollapsed()"
-          tsTooltip="Toggle navigation (⌘/)"
-        >
-          <lucide-icon name="panel-left" [size]="17" />
-        </button>
-
         <div class="brand" aria-label="TS Chart">
           <span class="logo" aria-hidden="true">
             <svg viewBox="0 0 24 24" width="20" height="20" fill="none">
@@ -58,16 +47,6 @@ export const APP_VERSION = '0.1.0';
           [tsTooltip]="theme.theme() === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'"
         >
           <lucide-icon [name]="theme.theme() === 'dark' ? 'sun' : 'moon'" [size]="17" />
-        </button>
-
-        <button
-          class="ts-icon-btn"
-          [class.is-active]="!layout.rightCollapsed()"
-          (click)="layout.toggleRight()"
-          [attr.aria-pressed]="!layout.rightCollapsed()"
-          tsTooltip="Toggle details panel (⌘.)"
-        >
-          <lucide-icon name="panel-right" [size]="17" />
         </button>
 
         <div class="sep"></div>
@@ -176,7 +155,6 @@ export const APP_VERSION = '0.1.0';
 })
 export class ToolbarComponent {
   readonly theme = inject(ThemeService);
-  readonly layout = inject(LayoutService);
   readonly version = APP_VERSION;
   menuOpen = false;
 
