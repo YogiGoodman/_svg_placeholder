@@ -143,6 +143,7 @@ export const APP_VERSION = '0.1.0';
         background: var(--ts-border);
         margin: 0 var(--ts-space-1);
       }
+      /* Neutral — accent blue is reserved for interactive signal, not decor. */
       .avatar {
         display: inline-flex;
         align-items: center;
@@ -150,8 +151,9 @@ export const APP_VERSION = '0.1.0';
         width: 30px;
         height: 30px;
         border-radius: var(--ts-radius-pill);
-        background: linear-gradient(135deg, var(--ts-accent), var(--ts-accent-strong));
-        color: var(--ts-accent-contrast);
+        background: var(--ts-bg-active);
+        border: 1px solid var(--ts-border-strong);
+        color: var(--ts-text-bright);
         cursor: pointer;
         transition: transform var(--ts-dur-1) var(--ts-ease),
           box-shadow var(--ts-dur-1) var(--ts-ease);

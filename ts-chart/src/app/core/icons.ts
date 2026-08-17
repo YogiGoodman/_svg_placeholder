@@ -7,7 +7,7 @@ import {
   Calendar, GitCompare, Eye, EyeOff, Table, TriangleAlert, Lock, Info,
   Star, Download, Columns3, RefreshCw, TrendingUp, TrendingDown, ChartArea,
   ChartCandlestick, ChartLine, Palette, LayoutGrid, CircleAlert, Layers,
-  Square, Trash2, Minus, Plus, UnfoldHorizontal, CalendarRange, Copy,
+  Square, Trash2, Minus, Plus, UnfoldHorizontal, CalendarRange, Copy, Crosshair,
 } from 'lucide-angular';
 
 export const APP_ICONS = {
@@ -17,5 +17,5 @@ export const APP_ICONS = {
   Calendar, GitCompare, Eye, EyeOff, Table, TriangleAlert, Lock, Info,
   Star, Download, Columns3, RefreshCw, TrendingUp, TrendingDown, ChartArea,
   ChartCandlestick, ChartLine, Palette, LayoutGrid, CircleAlert, Layers,
-  Square, Trash2, Minus, Plus, UnfoldHorizontal, CalendarRange, Copy,
+  Square, Trash2, Minus, Plus, UnfoldHorizontal, CalendarRange, Copy, Crosshair,
 };

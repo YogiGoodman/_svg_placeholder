@@ -75,6 +75,19 @@ import { ExportService } from '../../core/export.service';
             }
           </div>
         </div>
+        <div class="pref">
+          <span class="pref__label">
+            <lucide-icon name="crosshair" [size]="15" /> Crosshair tooltip
+          </span>
+          <div class="ts-segmented">
+            <button [class.is-active]="!sel.hoverCard()" (click)="sel.hoverCard.set(false)">
+              Off
+            </button>
+            <button [class.is-active]="sel.hoverCard()" (click)="sel.hoverCard.set(true)">
+              On
+            </button>
+          </div>
+        </div>
       </div>
 
       <hr class="ts-divider" />
@@ -129,8 +142,9 @@ import { ExportService } from '../../core/export.service';
         height: 38px;
         flex: none;
         border-radius: var(--ts-radius-pill);
-        background: linear-gradient(135deg, var(--ts-accent), var(--ts-accent-strong));
-        color: var(--ts-accent-contrast);
+        background: var(--ts-bg-active);
+        border: 1px solid var(--ts-border-strong);
+        color: var(--ts-text-bright);
         font-weight: var(--ts-fw-bold);
         font-size: var(--ts-fs-lg);
       }
@@ -254,8 +268,7 @@ export class UserMenuComponent {
 
   resetLayout(): void {
     this.layout.resetSizes();
-    this.layout.leftCollapsed.set(false);
-    this.layout.rightCollapsed.set(false);
+    this.layout.closeDrawers(); // chart-first default: overlays closed
     this.close.emit();
   }
 }

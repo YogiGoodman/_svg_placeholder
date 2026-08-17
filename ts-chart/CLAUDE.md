@@ -39,6 +39,16 @@ MUST, in the same change:
   incompatible series dim in the legend with `n/a`.
 - Tooltips explain every disabled control (which series blocks it and why).
 
+## Layout doctrine (round-9 restructure)
+
+**Chart-first, transient chrome.** The chart card owns the pixels; selection
+(browse drawer via the 48px icon rail or ⌘K) and series details (inspector,
+opened from legend-row click / rail / ⌘.) are overlay drawers closed by
+default — never permanent panels. The chart header is ONE row that never
+wraps (strip truncates first; mode is a dropdown, intervals stay buttons);
+provenance lives in the card's status footer. Preferences go in the user
+menu, never in toolbars.
+
 ## Architecture notes
 
 - State lives in `src/app/core/` services; `SelectionService` is the single

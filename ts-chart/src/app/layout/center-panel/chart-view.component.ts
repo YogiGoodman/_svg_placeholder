@@ -44,6 +44,7 @@ import { modeSupported } from '../../core/modes';
 import { ThemeService } from '../../core/theme.service';
 import { CustomRange, SelectionService } from '../../core/selection.service';
 import { ChartInteractionService } from '../../core/chart-interaction.service';
+import { LayoutService } from '../../core/layout.service';
 import { TooltipDirective } from '../../core/tooltip.directive';
 import { formatPct, formatSigned, formatValue } from '../../core/format';
 
@@ -137,7 +138,13 @@ const SERIES_DEF: Record<SeriesType, SeriesDefinition<SeriesType>> = {
           @for (row of visibleRows(); track row.id) {
             <div class="lrow" [class.is-hidden]="row.hidden || row.unsupported || !!row.broken">
               <span class="lrow__dot" [style.background]="row.color"></span>
-              <span class="lrow__label ts-truncate" [tsTooltip]="row.label">{{ row.label }}</span>
+              <button
+                class="lrow__label ts-truncate"
+                (click)="openInspector()"
+                tsTooltip="Series details"
+              >
+                {{ row.label }}
+              </button>
               @if (row.broken) {
                 <lucide-icon
                   class="lrow__stat"
@@ -257,6 +264,23 @@ const SERIES_DEF: Record<SeriesType, SeriesDefinition<SeriesType>> = {
         </div>
       }
 
+      <!-- Crosshair-following tooltip (toggleable, off by default) -->
+      @if (sel.hoverCard() && cursorPt(); as pt) {
+        @if (hoverDate(); as hd) {
+          <div class="hcard" [style.left.px]="hcardX()" [style.top.px]="hcardY()">
+            <div class="hcard__date ts-mono">{{ hd }}</div>
+            @for (row of cardRows(); track row.id) {
+              <div class="hcard__row">
+                <span class="hcard__dot" [style.background]="row.color"></span>
+                <span class="hcard__sym ts-mono">{{ row.label }}</span>
+                <span class="hcard__val ts-mono">{{ fmt(row.value) }}</span>
+                <span class="hcard__unit">{{ row.unit }}</span>
+              </div>
+            }
+          </div>
+        }
+      }
+
       <!-- Nothing drawable in this mode — explicit notice, never a silent blank -->
       @if (series().length > 0 && drawnCount() === 0) {
         <div class="nodraw">
@@ -283,8 +307,8 @@ const SERIES_DEF: Record<SeriesType, SeriesDefinition<SeriesType>> = {
         position: absolute;
         inset: 0;
       }
-      /* Near-transparent so price action stays visible underneath; the blur
-         alone keeps text legible over busy lines (capital.com pattern). */
+      /* ONE fully-opaque container — never translucent, never bare text over
+         lines. One border for the whole legend beats a border per row. */
       .legend {
         position: absolute;
         top: var(--ts-space-3);
@@ -293,11 +317,12 @@ const SERIES_DEF: Record<SeriesType, SeriesDefinition<SeriesType>> = {
         display: flex;
         flex-direction: column;
         align-items: flex-start;
-        gap: var(--ts-space-1);
-        padding: var(--ts-space-1) var(--ts-space-2);
+        gap: 1px;
+        padding: var(--ts-space-1);
         border-radius: var(--ts-radius-md);
-        background: color-mix(in srgb, var(--ts-bg-elevated) 55%, transparent);
-        backdrop-filter: blur(6px);
+        background: var(--ts-bg-elevated);
+        border: 1px solid var(--ts-border-subtle);
+        box-shadow: var(--ts-shadow-1);
         max-width: 320px;
         pointer-events: auto;
       }
@@ -306,22 +331,19 @@ const SERIES_DEF: Record<SeriesType, SeriesDefinition<SeriesType>> = {
         align-items: center;
         gap: 4px;
         height: 20px;
-        padding: 0 var(--ts-space-1);
+        padding: 0 var(--ts-space-2);
         border-radius: var(--ts-radius-xs);
         color: var(--ts-text-muted);
         cursor: pointer;
         flex: none;
       }
       .legend__toggle:hover {
-        background: var(--ts-bg-active);
+        background: var(--ts-bg-hover);
         color: var(--ts-text-bright);
       }
       .legend__count {
         font-size: var(--ts-fs-xxs);
         font-variant-numeric: tabular-nums;
-      }
-      .legend.is-collapsed {
-        padding: 2px;
       }
       .legend__rows {
         display: flex;
@@ -333,7 +355,7 @@ const SERIES_DEF: Record<SeriesType, SeriesDefinition<SeriesType>> = {
         display: flex;
         align-items: center;
         gap: var(--ts-space-2);
-        padding: 2px var(--ts-space-1);
+        padding: 2px 6px;
         border-radius: var(--ts-radius-xs);
       }
       .lrow:hover {
@@ -343,7 +365,7 @@ const SERIES_DEF: Record<SeriesType, SeriesDefinition<SeriesType>> = {
         opacity: 0.45;
       }
       .lrow--more {
-        justify-content: center;
+        justify-content: flex-start;
         font-size: var(--ts-fs-xxs);
         color: var(--ts-text-muted);
         cursor: pointer;
@@ -378,6 +400,10 @@ const SERIES_DEF: Record<SeriesType, SeriesDefinition<SeriesType>> = {
         min-width: 48px;
         max-width: 84px;
         text-align: left;
+        cursor: pointer;
+      }
+      .lrow__label:hover {
+        color: var(--ts-text-bright);
       }
       .lrow__num {
         display: inline-flex;
@@ -440,6 +466,50 @@ const SERIES_DEF: Record<SeriesType, SeriesDefinition<SeriesType>> = {
         margin-left: auto;
         color: var(--ts-warn);
         flex: none;
+      }
+      .hcard {
+        position: absolute;
+        z-index: 6;
+        min-width: 150px;
+        max-width: 240px;
+        padding: var(--ts-space-2);
+        border-radius: var(--ts-radius-md);
+        background: var(--ts-bg-elevated);
+        border: 1px solid var(--ts-border);
+        box-shadow: var(--ts-shadow-2);
+        pointer-events: none;
+      }
+      .hcard__date {
+        font-size: var(--ts-fs-xxs);
+        color: var(--ts-text-muted);
+        margin-bottom: var(--ts-space-1);
+      }
+      .hcard__row {
+        display: flex;
+        align-items: center;
+        gap: var(--ts-space-2);
+        height: 18px;
+      }
+      .hcard__dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 2px;
+        flex: none;
+      }
+      .hcard__sym {
+        font-size: var(--ts-fs-xs);
+        color: var(--ts-text-secondary);
+        min-width: 44px;
+      }
+      .hcard__val {
+        margin-left: auto;
+        font-size: var(--ts-fs-xs);
+        color: var(--ts-text-bright);
+        font-variant-numeric: tabular-nums;
+      }
+      .hcard__unit {
+        font-size: var(--ts-fs-xxs);
+        color: var(--ts-text-muted);
       }
       .nodraw {
         position: absolute;
@@ -574,8 +644,9 @@ export class ChartViewComponent implements OnDestroy {
 
   private readonly host = viewChild.required<ElementRef<HTMLDivElement>>('host');
   private readonly theme = inject(ThemeService);
-  private readonly sel = inject(SelectionService);
+  readonly sel = inject(SelectionService);
   private readonly interaction = inject(ChartInteractionService);
+  private readonly layoutSvc = inject(LayoutService);
 
   private chart?: IChartApi;
   private active: ActiveSeries[] = [];
@@ -596,6 +667,28 @@ export class ChartViewComponent implements OnDestroy {
   readonly hoverOhlc = signal<OhlcHover | null>(null);
   readonly lastOhlc = signal<OhlcHover | null>(null);
   readonly ohlcRow = computed(() => this.hoverOhlc() ?? this.lastOhlc());
+
+  /** Cursor position for the crosshair-following tooltip (host-relative px). */
+  readonly cursorPt = signal<{ x: number; y: number } | null>(null);
+
+  readonly cardRows = computed(() =>
+    this.legendRows().filter((r) => !r.hidden && !r.unsupported && !r.broken && r.value != null),
+  );
+
+  /** Card position: offset from cursor, flipped near the right/bottom edges. */
+  readonly hcardX = computed(() => {
+    const pt = this.cursorPt();
+    if (!pt) return 0;
+    const w = this.host().nativeElement.clientWidth;
+    return pt.x + 190 > w ? Math.max(4, pt.x - 190) : pt.x + 14;
+  });
+  readonly hcardY = computed(() => {
+    const pt = this.cursorPt();
+    if (!pt) return 0;
+    const h = this.host().nativeElement.clientHeight;
+    const est = 30 + this.cardRows().length * 18;
+    return pt.y + 14 + est > h ? Math.max(4, pt.y - est - 10) : pt.y + 14;
+  });
 
   readonly visibleRows = computed(() => {
     const rows = this.legendRows();
@@ -757,6 +850,10 @@ export class ChartViewComponent implements OnDestroy {
 
   toggleHidden(id: string): void {
     this.sel.toggleHidden(id);
+  }
+  /** Legend row label click → open the on-demand series inspector. */
+  openInspector(): void {
+    this.layoutSvc.openRight();
   }
   remove(id: string): void {
     this.sel.remove(id);
@@ -1175,14 +1272,24 @@ export class ChartViewComponent implements OnDestroy {
   }
 
   // --- live values + overlays ------------------------------------------------
-  private onCrosshair(param: { time?: Time; seriesData: Map<unknown, unknown> }): void {
+  private onCrosshair(param: {
+    time?: Time;
+    point?: { x: number; y: number };
+    seriesData: Map<unknown, unknown>;
+  }): void {
     if (!param.time) {
       this.hoverVals.set({});
       this.hoverDate.set(null);
       this.hoverOhlc.set(null);
+      this.cursorPt.set(null);
       if (this.pointerInside) this.interaction.clear(this.paneId());
       return;
     }
+    this.cursorPt.set(
+      this.sel.hoverCard() && this.pointerInside && param.point
+        ? { x: param.point.x, y: param.point.y }
+        : null,
+    );
     const next: Record<string, number | null> = {};
     let ohlc: OhlcHover | null = null;
     for (const a of this.active) {

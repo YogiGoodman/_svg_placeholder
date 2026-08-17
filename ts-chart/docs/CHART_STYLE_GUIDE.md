@@ -80,12 +80,23 @@ chart.addSeries(CandlestickSeries, {
 
 ## 3. The signatures that make it feel premium
 
-1. **Fixed left legend with live values + controls.** A **near-transparent**
-   overlay (~55% surface + blur — price action stays visible underneath; the
-   blur alone keeps text legible), not a chart primitive, driven by
-   `subscribeCrosshairMove`; when the cursor leaves, fall back to the last
-   datapoint. **Rows only, no header** — row 1 carries identity, the toolbar
-   carries the mode. One row per series: `● label  value  👁  ✕` — the
+1. **Fixed left legend with live values + controls.** **One fully-opaque
+   container** (`bg-elevated`, single hairline border, shadow-1) holding
+   borderless rows — one border for the whole legend, not per row. Two banned
+   alternatives, both field-tested and failed: translucent panels (smudge over
+   price action) and ghost text with text-shadow (unreadable wherever lines
+   run). Not a chart primitive; driven by `subscribeCrosshairMove`, falling
+   back to the last datapoint when the cursor leaves. **Rows only, no header**
+   — row 1 carries identity, the toolbar carries the mode. Row-label click
+   opens the series inspector; the collapse control sits below the rows inside
+   the container.
+   *Future (needs async data): an inline 3-dot loading indicator per legend
+   row while a series loads — capital.com does this well.*
+2. **Crosshair tooltip (toggle, default off).** `subscribeCrosshairMove` also
+   yields `param.point` — position a solid card at `point + 14px`, flipping
+   left/up near the right/bottom edges; `pointer-events: none` so it never
+   steals the crosshair. Content: hovered date + per-series `dot · SYM ·
+   value + unit`. Only the pane physically under the pointer shows it. One row per series: `● label  value  👁  ✕` — the
    **👁/✕ reveal only on row hover or keyboard focus** (buttons keep their width so
    rows never shift). The eye toggles visibility (row dims to 45% but **stays
    listed** — hide must never look like delete, so feed the legend all selected

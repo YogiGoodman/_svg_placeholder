@@ -23,7 +23,7 @@ import {
   TODAY,
 } from '../../data/series-generator';
 import { ChartLayout, ChartMode, ChartType } from '../../data/models';
-import { MODE_META, TYPE_META, typeSupported, unsupportedReason } from '../../core/modes';
+import { MODE_LABEL, MODE_META, TYPE_META, typeSupported, unsupportedReason } from '../../core/modes';
 import { formatDate, formatPct, formatSigned, formatValue } from '../../core/format';
 import { TooltipDirective } from '../../core/tooltip.directive';
 import { ChartViewComponent } from './chart-view.component';
@@ -50,20 +50,68 @@ const LAYOUTS: { id: ChartLayout; label: string; icon: string }[] = [
   ],
   template: `
     <section #card class="card" [class.is-fs]="fs.active()">
-      <!-- Chart toolbar — row 1: data scope (mode + as-of + range) -->
+      <!-- Chart toolbar — ONE row: identity → data scope → actions -->
       <header class="bar">
-        <div class="bar__row">
-          <!-- View mode (what data) -->
-          <div class="ts-segmented" [class.dim]="!ready()">
-            @for (m of modes; track m.id) {
-              <button
-                [class.is-active]="sel.chartMode() === m.id"
-                [disabled]="!ready() || !allowed().includes(m.id)"
-                [tsTooltip]="modeTip(m.id)"
-                (click)="sel.setChartMode(m.id)"
+          <!-- Identity first (terminal grammar): live stats strip -->
+          @if (strip(); as st) {
+            <div class="strip ts-mono">
+              <span class="strip__sym" [style.color]="st.color">{{ st.sym }}</span>
+              <span class="strip__val">
+                {{ fmtV(st.last) }}
+                <span class="strip__unit">{{ st.unit }}</span>
+              </span>
+              @if (st.hoverDate) {
+                <span class="strip__date">@ {{ fmtD(st.hoverDate) }}</span>
+              }
+              <span
+                class="strip__chg"
+                [class.ts-up]="st.delta >= 0"
+                [class.ts-down]="st.delta < 0"
               >
-                {{ m.label }}
-              </button>
+                {{ fmtS(st.delta) }} ({{ fmtP(st.pct) }})
+              </span>
+              <span class="strip__range" tsTooltip="Low – high over the selected range">
+                {{ fmtV(st.lo) }} – {{ fmtV(st.hi) }}
+              </span>
+            </div>
+            <div class="sep"></div>
+          }
+
+          <!-- Mode: compact dropdown — scales past 5 modes, labels never wrap -->
+          <div class="dd">
+            <button
+              class="ts-btn dd__btn dd__btn--wide"
+              [class.is-active]="modeOpen()"
+              [disabled]="!ready()"
+              (click)="
+                modeOpen.set(!modeOpen());
+                typeOpen.set(false);
+                compareOpen.set(false);
+                rangeOpen.set(false)
+              "
+              tsTooltip="Chart mode — what data is shown"
+            >
+              <span>{{ modeLabel() }}</span>
+              <lucide-icon class="caret" name="chevron-down" [size]="12" />
+            </button>
+            @if (modeOpen()) {
+              <div class="dd__backdrop" (click)="modeOpen.set(false)"></div>
+              <div class="dd__pop dd__pop--left">
+                @for (m of modes; track m.id) {
+                  <button
+                    class="dd__row"
+                    [class.on]="sel.chartMode() === m.id"
+                    [disabled]="!allowed().includes(m.id)"
+                    [tsTooltip]="modeTip(m.id)"
+                    (click)="sel.setChartMode(m.id); modeOpen.set(false)"
+                  >
+                    {{ m.label }}
+                    @if (sel.chartMode() === m.id) {
+                      <lucide-icon class="tick" name="check" [size]="14" />
+                    }
+                  </button>
+                }
+              </div>
             }
           </div>
 
@@ -96,12 +144,13 @@ const LAYOUTS: { id: ChartLayout; label: string; icon: string }[] = [
             }
           </div>
 
-          <!-- Custom from–to window -->
+          <!-- Custom from–to window (as-of mode only) -->
+          @if (sel.chartMode() === 'asof') {
           <div class="dd">
             <button
               class="ts-icon-btn dd__btn"
               [class.is-active]="rangeOpen() || !!sel.customRange()"
-              [disabled]="!ready() || !intervalApplies()"
+              [disabled]="!ready()"
               (click)="rangeOpen.set(!rangeOpen()); typeOpen.set(false); compareOpen.set(false)"
               tsTooltip="Custom date range"
             >
@@ -141,36 +190,6 @@ const LAYOUTS: { id: ChartLayout; label: string; icon: string }[] = [
               </div>
             }
           </div>
-
-          <!-- Provenance: the habit of saying where numbers come from -->
-          @if (primary(); as p) {
-            <span class="prov ts-mono">{{ p.source }} · as of {{ fmtD(today) }}</span>
-          }
-        </div>
-
-        <!-- Row 2: primary-series stats strip + right-aligned actions -->
-        <div class="bar__row">
-          @if (strip(); as st) {
-            <div class="strip ts-mono">
-              <span class="strip__sym" [style.color]="st.color">{{ st.sym }}</span>
-              <span class="strip__val">
-                {{ fmtV(st.last) }}
-                <span class="strip__unit">{{ st.unit }}</span>
-              </span>
-              @if (st.hoverDate) {
-                <span class="strip__date">@ {{ fmtD(st.hoverDate) }}</span>
-              }
-              <span
-                class="strip__chg"
-                [class.ts-up]="st.delta >= 0"
-                [class.ts-down]="st.delta < 0"
-              >
-                {{ fmtS(st.delta) }} ({{ fmtP(st.pct) }})
-              </span>
-              <span class="strip__range" tsTooltip="Low – high over the selected range">
-                {{ fmtV(st.lo) }} – {{ fmtV(st.hi) }}
-              </span>
-            </div>
           }
 
           <div class="bar__actions">
@@ -298,7 +317,6 @@ const LAYOUTS: { id: ChartLayout; label: string; icon: string }[] = [
           <lucide-icon [name]="fs.active() ? 'minimize' : 'maximize'" [size]="16" />
           </button>
           </div>
-        </div>
       </header>
 
       <!-- Body -->
@@ -355,6 +373,17 @@ const LAYOUTS: { id: ChartLayout; label: string; icon: string }[] = [
 
         <div class="flash" [class.on]="flashOn()"></div>
       </div>
+
+      <!-- Status footer: provenance lives at the bottom, terminal-style -->
+      <footer class="cfoot ts-mono">
+        @if (primary(); as p) {
+          <span class="cfoot__src ts-truncate">{{ p.source }}</span>
+          <span class="cfoot__dot">·</span>
+        }
+        <span>as of {{ fmtD(today) }}</span>
+        <span class="cfoot__dot">·</span>
+        <span>demo data</span>
+      </footer>
     </section>
   `,
   styles: [
@@ -379,29 +408,22 @@ const LAYOUTS: { id: ChartLayout; label: string; icon: string }[] = [
         border-radius: 0;
         border: none;
       }
+      /* ONE row, NEVER wraps — a second band is a layout failure. The strip
+         shrinks/truncates first; everything else is fixed-size. */
       .bar {
         display: flex;
-        flex-direction: column;
-        gap: var(--ts-space-1);
+        align-items: center;
+        gap: var(--ts-space-2);
+        flex-wrap: nowrap;
+        min-width: 0;
+        min-height: 42px;
         padding: var(--ts-space-2) var(--ts-space-3);
         border-bottom: 1px solid var(--ts-border);
         flex: none;
       }
-      .bar__row {
-        display: flex;
-        align-items: center;
-        gap: var(--ts-space-2);
-        flex-wrap: wrap;
-        min-height: 34px;
-      }
       .bar .ts-segmented {
         height: 30px;
         align-items: center;
-      }
-      /* Row 2 must NEVER reflow while live values tick — no wrapping; the
-         strip truncates and every numeric slot has a reserved width. */
-      .bar__row:last-child {
-        flex-wrap: nowrap;
       }
       .bar__actions {
         display: flex;
@@ -415,7 +437,7 @@ const LAYOUTS: { id: ChartLayout; label: string; icon: string }[] = [
         display: flex;
         align-items: baseline;
         gap: var(--ts-space-3);
-        flex: 1 1 auto;
+        flex: 0 1 auto;
         min-width: 0;
         overflow: hidden;
         font-size: var(--ts-fs-sm);
@@ -579,23 +601,34 @@ const LAYOUTS: { id: ChartLayout; label: string; icon: string }[] = [
         gap: var(--ts-space-2);
         justify-content: flex-end;
       }
-      .prov {
-        margin-left: auto;
-        font-size: var(--ts-fs-xs);
-        color: var(--ts-text-muted);
-        white-space: nowrap;
-      }
-      @media (max-width: 899px) {
-        .prov {
-          display: none;
-        }
-      }
       /* Fullscreen: same controls, tighter chrome — every pixel is chart. */
       .card.is-fs .bar {
         padding-block: var(--ts-space-1);
+        min-height: 36px;
       }
-      .card.is-fs .bar__row {
-        min-height: 28px;
+      .dd__pop--left {
+        left: 0;
+        right: auto;
+      }
+      /* Status footer: provenance at the bottom, terminal-style. */
+      .cfoot {
+        display: flex;
+        align-items: center;
+        gap: var(--ts-space-2);
+        height: 22px;
+        padding: 0 var(--ts-space-3);
+        border-top: 1px solid var(--ts-border);
+        font-size: var(--ts-fs-xxs);
+        color: var(--ts-text-muted);
+        flex: none;
+        white-space: nowrap;
+        overflow: hidden;
+      }
+      .cfoot__src {
+        min-width: 0;
+      }
+      .cfoot__dot {
+        color: var(--ts-text-faint);
       }
       .asof:focus-within {
         border-color: var(--ts-accent);
@@ -752,6 +785,7 @@ export class ChartPanelComponent {
   readonly compareOpen = signal(false);
   readonly typeOpen = signal(false);
   readonly rangeOpen = signal(false);
+  readonly modeOpen = signal(false);
   readonly dataMin = DATA_MIN;
 
   readonly primary = this.sel.primary;
@@ -776,6 +810,7 @@ export class ChartPanelComponent {
   readonly typeLabel = computed(
     () => TYPE_META.find((t) => t.id === this.sel.chartType())?.label ?? 'Line',
   );
+  readonly modeLabel = computed(() => MODE_LABEL[this.sel.chartMode()] ?? 'Latest');
 
   /**
    * Row-2 stats strip for the primary charted series (last · Δ1d · range).

@@ -23,8 +23,13 @@ const DEFAULT_SIZES: PanelSizes = { left: 22, center: 56, right: 22 };
 export class LayoutService {
   private readonly bp = inject(BreakpointObserver);
 
-  readonly leftCollapsed = signal(false);
-  readonly rightCollapsed = signal(false);
+  /**
+   * Chart-first layout: both side surfaces are transient overlays, CLOSED by
+   * default. "Collapsed" = drawer closed. Left = browse drawer (tree/search),
+   * right = series inspector.
+   */
+  readonly leftCollapsed = signal(true);
+  readonly rightCollapsed = signal(true);
   readonly sizes = signal<PanelSizes>(this.readSizes());
 
   /** Responsive viewport bucket derived from CDK BreakpointObserver. */
@@ -43,17 +48,6 @@ export class LayoutService {
   readonly isMedium = computed(() => this.viewport() === 'medium');
 
   constructor() {
-    // On medium, auto-collapse the right panel; on small, collapse both.
-    effect(() => {
-      const v = this.viewport();
-      if (v === 'small') {
-        this.leftCollapsed.set(true);
-        this.rightCollapsed.set(true);
-      } else if (v === 'medium') {
-        this.rightCollapsed.set(true);
-      }
-    });
-
     effect(() => {
       localStorage.setItem(SIZES_KEY, JSON.stringify(this.sizes()));
     });
@@ -64,6 +58,14 @@ export class LayoutService {
   }
   toggleRight(): void {
     this.rightCollapsed.update((v) => !v);
+  }
+  /** Open the series inspector (e.g. from a legend row click). */
+  openRight(): void {
+    this.rightCollapsed.set(false);
+  }
+  closeDrawers(): void {
+    this.leftCollapsed.set(true);
+    this.rightCollapsed.set(true);
   }
 
   setSizes(next: PanelSizes): void {

@@ -35,6 +35,8 @@ interface WorkspaceState {
   interval: IntervalKey;
   customRange: CustomRange | null;
   asOf: string;
+  /** Crosshair-following tooltip (optional — older payloads lack it). */
+  hoverCard?: boolean;
 }
 
 /**
@@ -68,6 +70,8 @@ export class SelectionService {
   readonly customRange = signal<CustomRange | null>(this.ws?.customRange ?? null);
   /** Shared as-of date (drives `asof` + `forward` snapshots). */
   readonly asOf = signal<string>(this.ws?.asOf ?? TODAY);
+  /** Crosshair-following tooltip on the chart — OFF by default. */
+  readonly hoverCard = signal<boolean>(this.ws?.hoverCard ?? false);
 
   /**
    * Compare set: the ≤3 series actually charted. Empty → default to the first
@@ -182,6 +186,7 @@ export class SelectionService {
         interval: this.interval(),
         customRange: this.customRange(),
         asOf: this.asOf(),
+        hoverCard: this.hoverCard(),
       };
       try {
         localStorage.setItem(WORKSPACE_KEY, JSON.stringify(state));
@@ -251,6 +256,10 @@ export class SelectionService {
 
   clearCustomRange(): void {
     this.customRange.set(null);
+  }
+
+  toggleHoverCard(): void {
+    this.hoverCard.update((v) => !v);
   }
 
   setAsOf(date: string): void {

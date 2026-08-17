@@ -89,30 +89,34 @@ blue series hues — neutral surfaces make the data colors pop.
 ## 2. Layout
 
 ```
-┌──────────────────────────────────────────── Toolbar (48px) ──────────────┐
-│ [☰] ◆ TS Chart ·Prototype                    ☀  �右  (Y avatar → popover) │
-├───────────┬──────────────────────────────────────────┬───────────────────┤
-│ Left nav  │  Chart panel (card)                       │ Info panel        │
-│ 3 tabs    │  ┌ row1: Latest|As of|Fwd|Strip|Seas · 📅 · 1M…ALL ┐ "Series   │
-│ + search  │  │ row2: SYM last Δ lo–hi   … type▾ Compare Chart|Data 📷 ⛶ │  Details" │
-│ + tree    │  └──────────────────────────────────────────────────┘ cards    │
-│ (resizer) │  legend(left) · today line · price pill    │ (resizer)         │
-└───────────┴──────────────────────────────────────────┴───────────────────┘
+┌──────────────────────────── Toolbar (48px) ──────────────────────────────┐
+│ [☰] ◆ TS Chart                                    ☀  ▐  (avatar → menu)  │
+├──┬───────────────────────────────────────────────────────────────────────┤
+│🔍│  Chart card                                                           │
+│ⓘ │  ┌ ONE header row: SYM 72.64 +0.4 (+0.5%) lo–hi │ Latest▾ 📅 1M…ALL  │
+│  │  │                              … type▾ Compare Chart|Data 📷 ⛶     │ │
+│r │  │            chart · legend · today line · value tags              │ │
+│a │  └ footer 22px: ICE Brent (reference) · as of 16 Aug 2026 · demo    │ │
+│i │                                                                       │
+│l │   [browse drawer ⇐ overlay]                [inspector overlay ⇒]      │
+└──┴───────────────────────────────────────────────────────────────────────┘
 ```
 
-- **Three panels**, side panels collapsible + drag-resizable (`angular-split`).
-  Sizes persist to `localStorage`.
-- **Vertical space is sacred.** Toolbar 48px, tab bar/panel headers ~40px. The
-  chart toolbar is **two 34px rows with strict roles**: row 1 = data scope (mode
-  segmented + as-of date + interval range), row 2 = a Bloomberg-style **stats
-  strip** for the primary series (symbol · last · Δ1d · lo–hi) on the left and all
-  chart **actions right-aligned** (type, Compare, Chart|Data, screenshot,
-  fullscreen). Rows wrap only on small screens.
-- **Responsive** (CDK `BreakpointObserver`):
-  - **Large ≥1280**: all three panels open.
-  - **Medium 768–1279**: right panel auto-collapses; tab labels hide to icons.
-  - **Small <768**: panels become slide-over **drawers** with a scrim; chart goes
-    full width; chart toolbar wraps.
+- **Chart-first, transient chrome.** The chart card owns the pixels. Selection
+  (tree + search) and series details are **overlay drawers**, not permanent
+  panels: a 48px **icon rail** opens the browse drawer; the **inspector** opens
+  from a legend-row click, the rail, or `⌘.`. Scrim/Esc closes both. ⌘K is the
+  fast selection path; the drawer is the browse fallback.
+- **Vertical space is sacred.** Toolbar 48px; the chart header is **ONE row**
+  that never wraps: stats strip (identity first — symbol · last · Δ1d · lo–hi,
+  shrinks/truncates before anything else moves) → **mode dropdown** (a 5-button
+  segmented could not survive width changes; dropdowns scale past 5 modes) →
+  as-of date (contextual) → interval buttons (highest-frequency switch keeps
+  buttons) → custom range (as-of only) → right-aligned actions. Provenance
+  lives in a 22px **status footer** at the card's bottom, terminal-style —
+  never in the header.
+- **Responsive**: the same overlay model works at every width — drawers are
+  already drawers on mobile; below 768px they span from the screen edge.
 
 ---
 
@@ -122,13 +126,14 @@ blue series hues — neutral surfaces make the data colors pop.
 |---|---|
 | **Toolbar** | Left: nav toggle, logo mark + wordmark (no status badges — nothing that undermines trust). Right: **theme toggle** (single source of truth), info toggle, avatar. Avatar opens a **CDK overlay** popover — identity, density, max-series, reset layout, **export design kit**, version. Theme is **not** duplicated in the popover. |
 | **Command palette** | **⌘K** opens a centered palette: type a ticker → ↑↓ → ↵ toggles the series into the chart and the input clears for the next ticker (rapid multi-add, Bloomberg muscle memory); Esc closes. Empty query shows **recent** series. Below the series, filtered **commands** (theme, chart/data view, layouts, allowed modes, panel toggles, clear selection) with their shortcuts. The whole select-and-chart loop needs no mouse. |
-| **Nav tree** | 3 tabs (Forecast / Contracts / Regions). Leaves are **multi-select** — clicking toggles a series into the comparison set; the cap is set in the user menu (default 8, oldest drops out when full). **Unselected leaves are plain text** (no dot, no icon — scales to huge catalogs); a **selected** leaf shows its assigned palette dot + a subtle `--ts-accent-weak` background, nothing else (no tick, caption never swaps → zero layout shift). Search replaces the tree with a flat result list using the same convention. Parents show a leaf **count**; status badges (`LOCKED` / `N/A`) stay. **Expansion state is held app-wide** (service, not component-local) so switching tabs round-trips losslessly; top levels start expanded. |
-| **Chart panel** | A single `lg`-radius card with a **two-row toolbar**. **Row 1 — data scope**: mode segmented (Latest / As of / Forward / Strip / Seasonal), a contextual **as-of date** (point-in-time modes), and the interval range (1M…ALL). **Row 2**: a **stats strip** for the primary series (`SYM last unit Δ1d (%) lo–hi`, mono, shown in time-axis modes) on the left; right-aligned actions = chart-type dropdown (icon trigger, tooltip names the current type), **Compare** popover, Chart/Data toggle, screenshot, fullscreen. No series name/count in the header — the legend and info panel own identity. |
+| **Icon rail + drawers** | A 48px rail replaces permanent side panels: 🔍 opens the **browse drawer** (tabs + search + tree, overlay, scrim/Esc closes — stays open during multi-select), ⓘ opens the **series inspector**. The inspector also opens contextually from a **legend-row click**. Both closed by default — selection is an event, not a state. |
+| **Nav tree** (inside the browse drawer) | 3 tabs (Forecast / Contracts / Regions). Leaves are **multi-select** — clicking toggles a series into the comparison set; the cap is set in the user menu (default 8, oldest drops out when full). **Unselected leaves are plain text** (no dot, no icon — scales to huge catalogs); a **selected** leaf shows its assigned palette dot + a subtle `--ts-accent-weak` background, nothing else (no tick, caption never swaps → zero layout shift). Search replaces the tree with a flat result list using the same convention. Parents show a leaf **count**; status badges (`LOCKED` / `N/A`) stay. **Expansion state is held app-wide** (service, not component-local) so switching tabs round-trips losslessly; top levels start expanded. |
+| **Chart panel** | A single `lg`-radius card with a **one-row toolbar** (never wraps): **stats strip first** (identity + price, terminal grammar; truncates before anything moves) → **mode dropdown** (Latest/As of/Forward/Strip/Seasonal — disabled rows tooltip why) → contextual as-of date → interval buttons → custom-range (as-of only) → right-aligned actions (type▾, Compare, Chart|Data, screenshot, fullscreen). Below the chart body, a 22px **status footer**: `source · as of date · demo data`. Preferences (crosshair tooltip, density, max-series) live in the **user menu**, never in the toolbar — toolbars are for actions, menus are for preferences. |
 | **Chart zoom** | A glassy **− / + / fit** pill overlays the chart bottom-right, **always visible** (discoverability beats minimalism for core controls). Fit uses the `unfold-horizontal` icon — never a fullscreen-lookalike. Zoom steps ±25% around the visible-range center; fit = `fitContent()`. |
 | **Chart type vs mode** | **Type** = *how* it's drawn (line / area / candles) — a small capital.com-style dropdown; **Line is the default**. `area` needs a **single** series (overlapping fills reduce readability) and `candles` one OHLC-capable series on a time-axis mode — unavailable types are **disabled with an explanatory tooltip, never silently downgraded** (silent fallbacks make two types look identical). **Mode** = *what data* (below). They are independent. |
 | **Chart modes** | Gated by per-series capability (`core/modes.ts`) with a **union policy**: a mode is enabled if **any** charted series supports it; incompatible series stay in the legend **dimmed with an `n/a` tag** (not drawn) and return on mode switch. A mode is fully disabled only when *no* series supports it — tooltips name the affected series either way. **Latest** — plain timeseries (all series). **As of** — point-in-time snapshot as-of a chosen **date** (vintage-revised tail), `AS OF` marker. **Forward** — forward curve by delivery bucket (months → quarters → cal years), as-of a date. **Strip** — block-average of consecutive forward contracts (Cal strip), stepped per year. **Seasonal** — one line per year on a Jan–Dec axis, recent brightest. |
 | **Compare / layout** | Selection holds up to `maxSeries` (8) and **every visible series is drawn** (overlay). A **Compare** popover picks the **layout**: **Single** (one), **Overlay** (all, one price scale), or **Split** (up to 3 chosen panes). Panes share one date-range/crosshair event. |
-| **Legend** (fixed, left, **collapsible**) | **Rows only — no header.** The first row carries identity; the toolbar's mode bar carries the mode (a header would duplicate both). Background is **near-transparent** (~55% + blur) so price action stays visible underneath. The collapse control sits **below the last row, left-aligned**; collapsed state = just that control showing a chevron + total count (`▸ 3`). The whole legend **disappears when no series is charted**. One row per series `dot · label · value **+ its own unit** · 👁 · 🗑` — the **eye/trash reveal only on row hover or keyboard focus** (buttons keep their width, so nothing shifts; TradingView pattern). Each series shows **its own UOM**. Values are **live** (crosshair-driven, fall back to last); a signed **delta per row** only where meaningful (latest / as-of). **Eye** shows/hides (row dims to 45%, stays listed — hide is never delete); series that don't support the active mode dim with an **`n/a`** tag instead of a value. **🗑** removes from the selection. Per-series value tags pin to the right edge. |
+| **Legend** (fixed, left, **collapsible**) | **Rows only — no header — ONE fully-opaque container** (`bg-elevated` + single hairline border + shadow-1): one border for the whole legend, not per row — smoother, calmer. Two failed alternatives, banned permanently: a translucent panel (reads as a smudge over price action) and bare/ghost text over lines (unreadable wherever lines run, both themes). Rows are borderless inside, hover = `bg-hover` + action icons reveal; **clicking a row's label opens the series inspector**. Values **column-align**. The collapse control sits below the last row inside the container; collapsed = the container shrinks to chevron + total count (`▸ 3`). The whole legend **disappears when no series is charted**. | One row per series `dot · label · value **+ its own unit** · 👁 · 🗑` — the **eye/trash reveal only on row hover or keyboard focus** (buttons keep their width, so nothing shifts; TradingView pattern). Each series shows **its own UOM**. Values are **live** (crosshair-driven, fall back to last); a signed **delta per row** only where meaningful (latest / as-of). **Eye** shows/hides (row dims to 45%, stays listed — hide is never delete); series that don't support the active mode dim with an **`n/a`** tag instead of a value. **🗑** removes from the selection. Per-series value tags pin to the right edge. |
 | **Info panel** | Titled **"Series Details"** with a live count badge. |
 | **Info cards** | **One collapsible card per selected series** (reusable `grid-rows 0fr→1fr` animation). Header is a single 40px center-aligned row: `symbol … Δ pill · 🗑 · chevron` (chevron far right). Each card shows the series value, signed change, source, frequency, currency, category and 2-year range. First card open, rest collapsed. |
 | **Data table** | Chart↔Data toggle renders the same series as a virtualized table (CDK `cdk-virtual-scroll`), sortable by date, OHLC or value+Δ, with a min/avg/max footer. |
@@ -178,6 +183,20 @@ token-tinted so they theme automatically.
 - **Live values must never reflow chrome.** Any strip/label that ticks on hover
   gets `flex-wrap: nowrap` on its row, `overflow: hidden` truncation, and
   reserved `ch`-unit widths per numeric slot — buttons never jump rows.
+- **The toolbar is ONE row and never wraps — a second band is a layout
+  failure.** The stats strip shrinks/truncates first; everything else is
+  fixed-size at a 30px optical height. Secondary choices (mode) are dropdowns,
+  not button rows — segmented buttons are reserved for the highest-frequency
+  switch (intervals). The custom-range picker appears **only in As-of mode**.
+- **Crosshair tooltip (optional, OFF by default):** a preference in the user
+  menu enables a solid card that follows the crosshair — hovered date + one
+  row per drawn series (dot · SYM · value + unit). Solid surface, `shadow-2`,
+  `pointer-events: none`, flips near right/bottom edges. Persists with the
+  workspace.
+- **Blue is the interactive accent and nothing else.** Industry-standard choice
+  (TradingView, capital.com); keep it for genuine interaction signals (active
+  tab, selected states, focus). **No decorative blue** — gradients on avatars
+  and similar ornaments use neutral surfaces.
 - **Focus & disabled**: one global `:focus-visible` accent ring (reset); text
   inputs suppress it and paint their own accent border/shadow (wrapper
   `:focus-within`) — never two rings at once. Disabled = `opacity: 0.45` +
