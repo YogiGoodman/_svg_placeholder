@@ -7,21 +7,21 @@ import {
   signal,
 } from '@angular/core';
 import { LucideAngularModule } from 'lucide-angular';
-import { TabId } from '../../data/models';
+import { TabId } from '../../../data/models';
 import {
   SERIES,
   TAB_ICONS,
   TAB_LABELS,
   TREES,
   searchSeries,
-} from '../../data/series-catalog.data';
-import { SelectionService } from '../../core/selection.service';
-import { SeriesColorService } from '../../core/series-color.service';
-import { TooltipDirective } from '../../core/tooltip.directive';
-import { TreeNodeComponent } from './tree-node.component';
-import { BROWSE_CHROME_STYLES } from './browse-chrome.styles';
+} from '../../../data/series-catalog.data';
+import { SelectionService } from '../../../core/selection.service';
+import { SeriesColorService } from '../../../core/series-color.service';
+import { TooltipDirective } from '../../../core/tooltip.directive';
+import { BROWSE_CHROME_STYLES } from '../../left-panel/browse-chrome.styles';
+import { DxThemeService } from './dx-theme';
+import { DxTreeListComponent } from './dx-tree-list.component';
 
-/** Short tab captions (full names live in the tooltip). */
 const TAB_SHORT: Record<TabId, string> = {
   forecast: 'Forecast',
   contracts: 'Contracts',
@@ -29,20 +29,19 @@ const TAB_SHORT: Record<TabId, string> = {
 };
 
 @Component({
-  selector: 'app-left-panel',
+  selector: 'app-dx-browse-panel',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [LucideAngularModule, TooltipDirective, TreeNodeComponent],
+  imports: [LucideAngularModule, TooltipDirective, DxTreeListComponent],
   template: `
     <section class="panel">
-      <!-- Dock header: title + own dismiss (mirrors the rail toggle) -->
       <header class="phead">
-        <span>Browse</span>
+        <span>Browse (DevExtreme)</span>
         <button
           class="ts-icon-btn phead__close"
           (click)="close.emit()"
-          tsTooltip="Hide panel (⌘/)"
-          aria-label="Hide browse panel"
+          tsTooltip="Hide panel"
+          aria-label="Hide DevExtreme tree panel"
         >
           <lucide-icon name="x" [size]="15" />
         </button>
@@ -121,38 +120,30 @@ const TAB_SHORT: Record<TabId, string> = {
               <img src="assets/placeholders/placeholder-points.svg" alt="" />
               <div>
                 <h3>No matches</h3>
-                <p>Nothing found for “{{ query() }}”. Try a symbol or tag.</p>
+                <p>Nothing found for "{{ query() }}". Try a symbol or tag.</p>
               </div>
             </div>
           }
         } @else {
-          <div class="tree" role="tree" (keydown)="onTreeKey($event)">
-            @for (root of roots(); track root.id) {
-              <app-tree-node [node]="root" [depth]="0" />
-            }
-          </div>
+          <app-dx-tree-list [roots]="roots()" />
         }
       </div>
 
-      <!-- Footer meta -->
+      <!-- Footer -->
       <div class="foot">
         <span class="ts-mono">{{ totalCount }} series</span>
-        @if (selection.count() > 0) {
-          <button class="clear-all" (click)="selection.clear()" tsTooltip="Clear all selected series">
-            <lucide-icon name="trash-2" [size]="13" />
-            Clear {{ selection.count() }}
-          </button>
-        }
       </div>
     </section>
   `,
   styles: [BROWSE_CHROME_STYLES],
 })
-export class LeftPanelComponent {
+export class DxBrowsePanelComponent {
+  /** Injected for its effect: keeps DevExtreme's stylesheet on the app's theme. */
+  private readonly dxTheme = inject(DxThemeService);
+
   readonly selection = inject(SelectionService);
   readonly colors = inject(SeriesColorService);
 
-  /** Emitted when the dock's own close control is used (rail mirrors this). */
   readonly close = output<void>();
 
   readonly tabs: TabId[] = ['forecast', 'contracts', 'regions'];
@@ -166,34 +157,4 @@ export class LeftPanelComponent {
 
   readonly roots = computed(() => TREES[this.activeTab()]);
   readonly results = computed(() => searchSeries(this.query()));
-
-  /** Arrow-key navigation: Up/Down walk visible rows, Right/Left expand/collapse. */
-  onTreeKey(e: KeyboardEvent): void {
-    const tree = e.currentTarget as HTMLElement;
-    const rows = Array.from(tree.querySelectorAll<HTMLButtonElement>('button.row'));
-    const idx = rows.indexOf(document.activeElement as HTMLButtonElement);
-    const focus = (i: number) => rows[Math.max(0, Math.min(rows.length - 1, i))]?.focus();
-
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      focus(idx + 1);
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      focus(idx - 1);
-    } else if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
-      const el = document.activeElement as HTMLButtonElement | null;
-      if (!el?.classList.contains('parent')) return;
-      const open = el.getAttribute('aria-expanded') === 'true';
-      if (e.key === 'ArrowRight' && !open) {
-        e.preventDefault();
-        el.click();
-      } else if (e.key === 'ArrowRight' && open) {
-        e.preventDefault();
-        focus(idx + 1); // into first child
-      } else if (e.key === 'ArrowLeft' && open) {
-        e.preventDefault();
-        el.click();
-      }
-    }
-  }
 }

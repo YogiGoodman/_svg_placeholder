@@ -247,6 +247,61 @@ flow a terminal exists to protect.
 
 ---
 
+**Lazy-load the level that is actually remote, not the whole tree.** Mark the
+branches whose children come from the server and answer everything else on the
+spot. If the entire structure goes through the async path, every expansion the
+data never needed becomes a round trip, and the operator sees a spinner for a
+folder you already had in memory.
+*Why:* "the tree is slow" and "this branch is remote" get conflated into one
+mechanism, and the cost lands on the ninety percent of expansions that were free.
+*Source:* `TreeNode.lazy` marks contract lists only; the taxonomy above them is
+answered synchronously.
+
+**A spinner over data you already hold is a lie about latency.** Cache a fetched
+branch, and make the cached read *synchronous* — with most grid libraries the
+return type is the signal, so `Promise.resolve(cached)` still raises a pending
+state even though it settles on the same tick. Disable the widget's global load
+panel outright: it veils the operator's primary navigation, and §24 already bans
+manufactured waiting.
+*Why:* traders read a tree while prices move. A flash of grey on a branch they
+opened two seconds ago reads as instability in the data, not in the widget.
+*Source:* `dx-tree-list.component.ts` — `fetched` cache, the array-vs-promise
+branch in `store.load`, and `<dxo-load-panel [enabled]="false" />`.
+
+**Cap what a branch renders; loading it fast is a different problem from
+reading it.** A forward curve with fifty monthly contracts loads in
+milliseconds and is still unusable — it buries every sibling branch and turns
+scanning into scrolling. Render a fixed number (12 here, a user preference) and
+fold the rest behind a "Show N more" row that states the count it is hiding.
+*Why:* lazy loading solves cost, not legibility, and the two get conflated
+because both are described as "there are too many". The operator's complaint is
+about the screen, not the network.
+*Where to do it:* inside the same load that produced the branch, where the full
+child list is already in hand — one `slice`, no second pass, and no row objects
+built for children that are never shown. Make the affordance a real row of the
+tree, not chrome bolted underneath it, so virtual scrolling, indentation and
+keyboard navigation treat it like everything else.
+*Style it as an action, not as data:* the accent token, not a muted one, and
+aligned to the same rail as the labels it summarises.
+*Source:* `dx-tree/dx-tree-list.component.ts` (`loadChildren`, `revealMore`),
+`TreeStateService.childLimit`.
+
+**A node that is both a leaf and a group gets two targets, not one.**
+In a real instrument taxonomy a node often *is* a series and *contains* series
+(Curve Builder › Brent › M+1 is a tradable curve point with 24 contracts under
+it). Give the row body the leaf action — chart it — and reserve expansion for the
+chevron alone, with a padded hit area. Show the leaf's color dot on it so its
+selected state reads the same as any other series.
+*Why:* the default "parents expand, leaves select" rule silently makes such a
+node unchartable, and a trader who clicks it to preview one curve point instead
+gets two dozen rows shoved onto the screen. The taxonomy is the product's, not
+the widget's — the interaction model has to follow the data, not the other way
+round.
+*Source:* `tree-node.component.ts` (`hasOwnSeries` / `activateParent`) and the DX
+mirror in `dx-tree/dx-tree-list.component.ts`.
+
+---
+
 ## 6 · Tidiness & states (the difference between "prototype" and "product")
 
 **28. Empty, loading, and error states are first-class, not afterthoughts.**
@@ -359,6 +414,17 @@ repeat them.
 | **Stale carry-forward value in the legend on hover** | showed a value on a date where the series had no point — a phantom reading | at the crosshair, absent point → "—", never the last known value; §33 |
 | **`SYM +N` legend header** | duplicated identity (row 1) and mode (toolbar) already on screen | don't repeat a value the eye can already see |
 | **Hardcoded per-series colors in the catalog** | didn't scale past a demo catalog; not theme-aware | assign colors at runtime; §7–8 |
+| **`display: none` on the vendor widget's icon container** (DevExtreme TreeList) | that container holds the indent spacers, not just the glyph — the whole hierarchy flattened to one level | never hide a vendor node to kill what it *draws*; neutralise the paint (`content: none`, `width: 0`) and leave the box that carries the geometry |
+| **Short override selectors** (`.dxtree .dx-treelist-empty-space`) against a vendor theme | the vendor rule was `.dx-treelist-rowsview .dx-row > td.dx-treelist-cell-expandable .dx-treelist-empty-space` — four classes; the override silently lost and looked like it had no effect | mirror the vendor's own selector and prefix your scope class, so you win by one class instead of reaching for `!important` |
+| **`hasChildren` alone deciding row behaviour** in a tree | nodes that are both a series and a group (Curve Builder › Brent › M+1) became unchartable — clicking to preview them expanded 24 contracts instead | branch on *what the node carries*, not on whether it has children; body charts, chevron expands |
+| **Overriding the vendor's light theme with dark colors** instead of loading its dark theme | the grid painted a `#2a2a2a` slab behind the tree in dark mode, and every un-enumerated vendor surface stayed light | swap the vendor's theme stylesheet from your theme signal; override only the surfaces your app deliberately owns |
+| **Trusting full-page screenshots while iterating on CSS** | the capture returned cached frames, so computed styles and "what I saw" disagreed three times and sent two fixes down the wrong path | verify with `getComputedStyle` / `getBoundingClientRect` on the painted element (`elementFromPoint`), and treat a screenshot that contradicts a measurement as a stale screenshot |
+| **Routing the whole tree through the lazy `CustomStore`** | every group expansion became an async load with a load panel, for a taxonomy that was in memory the whole time | mark only the genuinely remote level lazy; answer the rest synchronously |
+| **Returning `Promise.resolve(cached)` from a cached branch read** | the grid raised its pending state and flashed a load panel even though the promise settled on the same tick | return an array for cached reads — with grid libraries the return type, not the timing, is what triggers the spinner |
+| **Hanging the deep contract lists directly off the curve root** | flattened `Curve Builder › Brent › M+1 › Contracts` into `Curve Builder › contracts`, losing the level a trader navigates by | volume fixtures must keep the production shape; a fixture that changes the hierarchy tests a tree nobody will ship |
+| **Seeding long demo branches by reusing a pool of existing series ids** | one click lit up five rows, because every node bound to that series showed selected — the fixture lied about how selection behaves at scale | generate real records for volume fixtures; reused ids make identity bugs that only appear in the fixture, and hide the ones that do not |
+| **Assuming the cell template's parent is the widget's cell** | `devextreme-angular` silently wraps every `*dxTemplate` in its own unstyled `.dx-template-wrapper` div; the cell stretched to 299px while the row inside it stayed at 106px, so the unit and count never reached the right edge | when a framework binding layer sits between you and the widget, it has its own DOM — measure the real child chain in the browser before writing the third override |
+| **Styling `.dx-cell-content` in a TreeList** | that class is dxDataGrid's; TreeList wraps cell templates in `.dx-treelist-text-content` | verify the wrapper class against the vendor's renderer source, not against a sibling widget |
 
 ---
 
@@ -389,6 +455,71 @@ round against it — code-level reasoning misses what the eye catches.
 **External standards referenced:** WCAG 2.1 (contrast), CSS Color 4 / OKLCh
 (perceptual palette), TradingView Lightweight Charts (chart engine),
 Bloomberg/TradingView/capital.com (interaction conventions).
+
+---
+
+## 10 · Restyling a third-party widget to an in-house row spec
+
+A vendor grid/tree (DevExtreme TreeList here, but the rules hold for AG Grid,
+Kendo, PrimeNG) can be made pixel-identical to a hand-rolled component, but only
+if you treat its DOM as a contract you read rather than one you fight.
+
+**Rule: measure the rendered box chain in the browser, don't infer it.** Two
+rounds of correct-looking CSS failed here because the DOM had an element in it
+that neither the vendor's docs nor its renderer source mentioned — the Angular
+binding layer's own wrapper div. Reading source tells you what the vendor draws;
+only the live page tells you what your framework added on top.
+*Source:* the `.dx-template-wrapper` fix, found by dumping `getComputedStyle` and
+`getBoundingClientRect` down the cell's child chain.
+
+**Rule: read the vendor's renderer before writing a single override.** Find which
+element holds the geometry, which holds the paint, and what class wraps your own
+template. Guessing produces dead CSS that looks like a specificity problem.
+*Why:* in DevExtreme TreeList, indentation is `level + 1` spacer divs inside
+`.dx-treelist-icon-container`; the expand glyph is an absolutely-positioned
+`::before` on the trailing spacer; and cell templates are wrapped in
+`.dx-treelist-text-content` (not `.dx-cell-content`). None of that is guessable.
+*Source:* `node_modules/devextreme/esm/__internal/grids/tree_list/rows/m_rows.js`.
+
+**Rule: retune the vendor's geometry, don't replace it.** Keep the spacer
+elements and set their `width` to your design's indent step; collapse only the
+slot whose glyph you are replacing. Re-implementing indentation with your own
+padding fights the widget's virtualisation and best-fit measurement.
+*Why:* DX ships an 18px spacer plus a 4px trailing margin; the ts-chart row spec
+is 14px per level with no trailing gap. Setting spacer `width: 14px` and
+`--last { width: 0 }` reproduces `padding-left: calc(space-3 + depth * 14px)`
+exactly, with DX still owning row recycling.
+*Source:* `src/app/layout/right-panel/dx-tree/dx-tree-list.component.scss`.
+
+**Rule: match the vendor's selector specificity, scoped by one wrapper class.**
+Copy their selector, prefix your scope class. `!important` hides which rule is
+actually load-bearing and makes the next override worse.
+*Source:* same file — every indent rule is
+`.dxtree .dx-treelist-rowsview .dx-row > td.dx-treelist-cell-expandable …`.
+
+**Rule: if you drive state from your own store, the vendor's state classes are
+dead — style your own.** Selection here lives in `SelectionService`, so DX never
+applies `.dx-selection`; the cell template flags itself and the row reacts with
+`td:has(.cell-row.is-selected)`, which keeps the highlight reactive to signals
+without a `repaintRows` call.
+*Why:* rules written against vendor state classes that the configuration never
+produces are the most expensive kind of dead CSS — they read as working code.
+*Source:* `dx-tree-list.component.scss` selection block.
+
+**Rule: a vendor widget's dark mode is a different stylesheet, not different
+tokens.** Component libraries compile one stylesheet per theme. Dark mode means
+swapping the file through the vendor's own theme API and driving that swap from
+your app's theme signal — not overriding a light stylesheet with dark colors.
+*Why:* an override list only covers the surfaces you happened to notice. Every
+one you missed stays light, and they appear later on whichever widget you add
+next — the bug arrives long after the change that caused it. Swapping the file
+also keeps the inactive theme out of the critical path (788 kB → 11 kB of
+app CSS here).
+*Source:* `dx-tree/dx-theme.ts` plus the `rel="dx-theme"` links in `index.html`.
+
+**Rule: the vendor's empty/no-data state gets themed, never hidden.** Hiding it
+converts an explainable empty state into a silent blank panel — rule §28 applies
+to embedded widgets too.
 
 ---
 

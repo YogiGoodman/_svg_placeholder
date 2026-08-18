@@ -19,7 +19,9 @@ MUST, in the same change:
 
 The kit files that must stay in sync: `AGENTS.md`, `DESIGN_GUIDE.md`,
 `CHART_STYLE_GUIDE.md`, `UX_ENGINEERING_PLAYBOOK.md`, `WORKSPACE_PERSISTENCE.md`,
-`scss/*`, `tokens/*` (mirrors of `docs/` + `src/styles/`).
+`DEVEXTREME_TREELIST_GUIDE.md`, `scss/*`, `tokens/*` (mirrors of `docs/` +
+`src/styles/`). The export list in `src/app/core/export.service.ts` must name
+every one of them — a guide that is not in `KIT_FILES` never reaches the zip.
 
 ## Also non-negotiable: keep the playbook current
 

@@ -436,21 +436,149 @@ export const SERIES: Record<string, SeriesMeta> = {
     description: 'Delivered ex-ship North-West Europe LNG — the European seaborne LNG marker vs TTF.',
     shape: { base: 11.6, drift: -0.01, volatility: 0.035, seasonality: 0.18, seasonPhase: 200, floor: 4 },
   }),
+
+  // --- Deep nested contracts (Curve Builder) ---------------------------------
+  'brent-jan27': m({ id: 'brent-jan27', name: 'Brent Jan 2027', symbol: 'BRN JAN27', tab: 'contracts', path: ['Curve Builder', 'Brent', 'Contracts'], unit: 'USD/bbl', currency: 'USD', source: 'ICE Brent Jan-27', frequency: 'daily', chartKind: 'candlestick', tags: ['oil', 'monthly'], shape: { base: 81.2, drift: 0.03, volatility: 0.014, seasonality: 0.04, floor: 20 } }),
+  'brent-feb27': m({ id: 'brent-feb27', name: 'Brent Feb 2027', symbol: 'BRN FEB27', tab: 'contracts', path: ['Curve Builder', 'Brent', 'Contracts'], unit: 'USD/bbl', currency: 'USD', source: 'ICE Brent Feb-27', frequency: 'daily', chartKind: 'candlestick', tags: ['oil', 'monthly'], shape: { base: 81.0, drift: 0.03, volatility: 0.014, seasonality: 0.04, floor: 20 } }),
+  'brent-mar27': m({ id: 'brent-mar27', name: 'Brent Mar 2027', symbol: 'BRN MAR27', tab: 'contracts', path: ['Curve Builder', 'Brent', 'Contracts'], unit: 'USD/bbl', currency: 'USD', source: 'ICE Brent Mar-27', frequency: 'daily', chartKind: 'candlestick', tags: ['oil', 'monthly'], shape: { base: 80.8, drift: 0.03, volatility: 0.015, seasonality: 0.04, floor: 20 } }),
+  'brent-apr27': m({ id: 'brent-apr27', name: 'Brent Apr 2027', symbol: 'BRN APR27', tab: 'contracts', path: ['Curve Builder', 'Brent', 'Contracts'], unit: 'USD/bbl', currency: 'USD', source: 'ICE Brent Apr-27', frequency: 'daily', chartKind: 'candlestick', tags: ['oil', 'monthly'], shape: { base: 80.5, drift: 0.03, volatility: 0.015, seasonality: 0.04, floor: 20 } }),
+  'brent-may27': m({ id: 'brent-may27', name: 'Brent May 2027', symbol: 'BRN MAY27', tab: 'contracts', path: ['Curve Builder', 'Brent', 'Contracts'], unit: 'USD/bbl', currency: 'USD', source: 'ICE Brent May-27', frequency: 'daily', chartKind: 'candlestick', tags: ['oil', 'monthly'], shape: { base: 80.2, drift: 0.03, volatility: 0.015, seasonality: 0.04, floor: 20 } }),
+  'brent-jun27': m({ id: 'brent-jun27', name: 'Brent Jun 2027', symbol: 'BRN JUN27', tab: 'contracts', path: ['Curve Builder', 'Brent', 'Contracts'], unit: 'USD/bbl', currency: 'USD', source: 'ICE Brent Jun-27', frequency: 'daily', chartKind: 'candlestick', tags: ['oil', 'monthly'], shape: { base: 79.9, drift: 0.03, volatility: 0.015, seasonality: 0.04, floor: 20 } }),
+  'brent-jul27': m({ id: 'brent-jul27', name: 'Brent Jul 2027', symbol: 'BRN JUL27', tab: 'contracts', path: ['Curve Builder', 'Brent', 'Contracts'], unit: 'USD/bbl', currency: 'USD', source: 'ICE Brent Jul-27', frequency: 'daily', chartKind: 'candlestick', tags: ['oil', 'monthly'], shape: { base: 79.7, drift: 0.03, volatility: 0.015, seasonality: 0.04, floor: 20 } }),
+  'brent-aug27': m({ id: 'brent-aug27', name: 'Brent Aug 2027', symbol: 'BRN AUG27', tab: 'contracts', path: ['Curve Builder', 'Brent', 'Contracts'], unit: 'USD/bbl', currency: 'USD', source: 'ICE Brent Aug-27', frequency: 'daily', chartKind: 'candlestick', tags: ['oil', 'monthly'], shape: { base: 79.4, drift: 0.03, volatility: 0.015, seasonality: 0.04, floor: 20 } }),
+  'brent-sep27': m({ id: 'brent-sep27', name: 'Brent Sep 2027', symbol: 'BRN SEP27', tab: 'contracts', path: ['Curve Builder', 'Brent', 'Contracts'], unit: 'USD/bbl', currency: 'USD', source: 'ICE Brent Sep-27', frequency: 'daily', chartKind: 'candlestick', tags: ['oil', 'monthly'], shape: { base: 79.1, drift: 0.03, volatility: 0.016, seasonality: 0.04, floor: 20 } }),
+  'brent-oct27': m({ id: 'brent-oct27', name: 'Brent Oct 2027', symbol: 'BRN OCT27', tab: 'contracts', path: ['Curve Builder', 'Brent', 'Contracts'], unit: 'USD/bbl', currency: 'USD', source: 'ICE Brent Oct-27', frequency: 'daily', chartKind: 'candlestick', tags: ['oil', 'monthly'], shape: { base: 78.8, drift: 0.03, volatility: 0.016, seasonality: 0.04, floor: 20 } }),
+  'brent-nov27': m({ id: 'brent-nov27', name: 'Brent Nov 2027', symbol: 'BRN NOV27', tab: 'contracts', path: ['Curve Builder', 'Brent', 'Contracts'], unit: 'USD/bbl', currency: 'USD', source: 'ICE Brent Nov-27', frequency: 'daily', chartKind: 'candlestick', tags: ['oil', 'monthly'], shape: { base: 78.5, drift: 0.03, volatility: 0.016, seasonality: 0.04, floor: 20 } }),
+  'brent-dec27': m({ id: 'brent-dec27', name: 'Brent Dec 2027', symbol: 'BRN DEC27', tab: 'contracts', path: ['Curve Builder', 'Brent', 'Contracts'], unit: 'USD/bbl', currency: 'USD', source: 'ICE Brent Dec-27', frequency: 'daily', chartKind: 'candlestick', tags: ['oil', 'monthly'], shape: { base: 78.2, drift: 0.03, volatility: 0.016, seasonality: 0.04, floor: 20 } }),
+  'brent-roll-jan27': m({ id: 'brent-roll-jan27', name: 'Brent Roll Jan 2027', symbol: 'BRN R JAN27', tab: 'contracts', path: ['Curve Builder', 'Brent', 'Rolling'], unit: 'USD/bbl', currency: 'USD', source: 'ICE Brent Roll Jan-27', frequency: 'daily', chartKind: 'line', tags: ['oil', 'rolling'], shape: { base: 81.0, drift: 0.03, volatility: 0.013, seasonality: 0.04, floor: 20 } }),
+  'brent-roll-feb27': m({ id: 'brent-roll-feb27', name: 'Brent Roll Feb 2027', symbol: 'BRN R FEB27', tab: 'contracts', path: ['Curve Builder', 'Brent', 'Rolling'], unit: 'USD/bbl', currency: 'USD', source: 'ICE Brent Roll Feb-27', frequency: 'daily', chartKind: 'line', tags: ['oil', 'rolling'], shape: { base: 80.8, drift: 0.03, volatility: 0.013, seasonality: 0.04, floor: 20 } }),
+  'brent-roll-mar27': m({ id: 'brent-roll-mar27', name: 'Brent Roll Mar 2027', symbol: 'BRN R MAR27', tab: 'contracts', path: ['Curve Builder', 'Brent', 'Rolling'], unit: 'USD/bbl', currency: 'USD', source: 'ICE Brent Roll Mar-27', frequency: 'daily', chartKind: 'line', tags: ['oil', 'rolling'], shape: { base: 80.5, drift: 0.03, volatility: 0.013, seasonality: 0.04, floor: 20 } }),
+  'brent-roll-apr27': m({ id: 'brent-roll-apr27', name: 'Brent Roll Apr 2027', symbol: 'BRN R APR27', tab: 'contracts', path: ['Curve Builder', 'Brent', 'Rolling'], unit: 'USD/bbl', currency: 'USD', source: 'ICE Brent Roll Apr-27', frequency: 'daily', chartKind: 'line', tags: ['oil', 'rolling'], shape: { base: 80.2, drift: 0.03, volatility: 0.013, seasonality: 0.04, floor: 20 } }),
+  'brent-roll-may27': m({ id: 'brent-roll-may27', name: 'Brent Roll May 2027', symbol: 'BRN R MAY27', tab: 'contracts', path: ['Curve Builder', 'Brent', 'Rolling'], unit: 'USD/bbl', currency: 'USD', source: 'ICE Brent Roll May-27', frequency: 'daily', chartKind: 'line', tags: ['oil', 'rolling'], shape: { base: 79.9, drift: 0.03, volatility: 0.013, seasonality: 0.04, floor: 20 } }),
+  'brent-roll-jun27': m({ id: 'brent-roll-jun27', name: 'Brent Roll Jun 2027', symbol: 'BRN R JUN27', tab: 'contracts', path: ['Curve Builder', 'Brent', 'Rolling'], unit: 'USD/bbl', currency: 'USD', source: 'ICE Brent Roll Jun-27', frequency: 'daily', chartKind: 'line', tags: ['oil', 'rolling'], shape: { base: 79.6, drift: 0.03, volatility: 0.013, seasonality: 0.04, floor: 20 } }),
+  'brent-roll-jul27': m({ id: 'brent-roll-jul27', name: 'Brent Roll Jul 2027', symbol: 'BRN R JUL27', tab: 'contracts', path: ['Curve Builder', 'Brent', 'Rolling'], unit: 'USD/bbl', currency: 'USD', source: 'ICE Brent Roll Jul-27', frequency: 'daily', chartKind: 'line', tags: ['oil', 'rolling'], shape: { base: 79.3, drift: 0.03, volatility: 0.013, seasonality: 0.04, floor: 20 } }),
+  'brent-roll-aug27': m({ id: 'brent-roll-aug27', name: 'Brent Roll Aug 2027', symbol: 'BRN R AUG27', tab: 'contracts', path: ['Curve Builder', 'Brent', 'Rolling'], unit: 'USD/bbl', currency: 'USD', source: 'ICE Brent Roll Aug-27', frequency: 'daily', chartKind: 'line', tags: ['oil', 'rolling'], shape: { base: 79.0, drift: 0.03, volatility: 0.013, seasonality: 0.04, floor: 20 } }),
+  'brent-roll-sep27': m({ id: 'brent-roll-sep27', name: 'Brent Roll Sep 2027', symbol: 'BRN R SEP27', tab: 'contracts', path: ['Curve Builder', 'Brent', 'Rolling'], unit: 'USD/bbl', currency: 'USD', source: 'ICE Brent Roll Sep-27', frequency: 'daily', chartKind: 'line', tags: ['oil', 'rolling'], shape: { base: 78.7, drift: 0.03, volatility: 0.014, seasonality: 0.04, floor: 20 } }),
+  'brent-roll-oct27': m({ id: 'brent-roll-oct27', name: 'Brent Roll Oct 2027', symbol: 'BRN R OCT27', tab: 'contracts', path: ['Curve Builder', 'Brent', 'Rolling'], unit: 'USD/bbl', currency: 'USD', source: 'ICE Brent Roll Oct-27', frequency: 'daily', chartKind: 'line', tags: ['oil', 'rolling'], shape: { base: 78.4, drift: 0.03, volatility: 0.014, seasonality: 0.04, floor: 20 } }),
+  'brent-roll-nov27': m({ id: 'brent-roll-nov27', name: 'Brent Roll Nov 2027', symbol: 'BRN R NOV27', tab: 'contracts', path: ['Curve Builder', 'Brent', 'Rolling'], unit: 'USD/bbl', currency: 'USD', source: 'ICE Brent Roll Nov-27', frequency: 'daily', chartKind: 'line', tags: ['oil', 'rolling'], shape: { base: 78.1, drift: 0.03, volatility: 0.014, seasonality: 0.04, floor: 20 } }),
+  'brent-roll-dec27': m({ id: 'brent-roll-dec27', name: 'Brent Roll Dec 2027', symbol: 'BRN R DEC27', tab: 'contracts', path: ['Curve Builder', 'Brent', 'Rolling'], unit: 'USD/bbl', currency: 'USD', source: 'ICE Brent Roll Dec-27', frequency: 'daily', chartKind: 'line', tags: ['oil', 'rolling'], shape: { base: 77.8, drift: 0.03, volatility: 0.014, seasonality: 0.04, floor: 20 } }),
+  'ttf-jan27': m({ id: 'ttf-jan27', name: 'TTF Jan 2027', symbol: 'TTF JAN27', tab: 'contracts', path: ['Curve Builder', 'TTF', 'Contracts'], unit: 'EUR/MWh', currency: 'EUR', source: 'ICE Endex TTF Jan-27', frequency: 'daily', chartKind: 'candlestick', tags: ['gas', 'monthly'], shape: { base: 37.5, drift: -0.01, volatility: 0.025, seasonality: 0.07, floor: 8 } }),
+  'ttf-feb27': m({ id: 'ttf-feb27', name: 'TTF Feb 2027', symbol: 'TTF FEB27', tab: 'contracts', path: ['Curve Builder', 'TTF', 'Contracts'], unit: 'EUR/MWh', currency: 'EUR', source: 'ICE Endex TTF Feb-27', frequency: 'daily', chartKind: 'candlestick', tags: ['gas', 'monthly'], shape: { base: 36.8, drift: -0.01, volatility: 0.025, seasonality: 0.07, floor: 8 } }),
+  'ttf-mar27': m({ id: 'ttf-mar27', name: 'TTF Mar 2027', symbol: 'TTF MAR27', tab: 'contracts', path: ['Curve Builder', 'TTF', 'Contracts'], unit: 'EUR/MWh', currency: 'EUR', source: 'ICE Endex TTF Mar-27', frequency: 'daily', chartKind: 'candlestick', tags: ['gas', 'monthly'], shape: { base: 35.2, drift: -0.01, volatility: 0.024, seasonality: 0.07, floor: 8 } }),
+  'ttf-apr27': m({ id: 'ttf-apr27', name: 'TTF Apr 2027', symbol: 'TTF APR27', tab: 'contracts', path: ['Curve Builder', 'TTF', 'Contracts'], unit: 'EUR/MWh', currency: 'EUR', source: 'ICE Endex TTF Apr-27', frequency: 'daily', chartKind: 'candlestick', tags: ['gas', 'monthly'], shape: { base: 33.1, drift: -0.01, volatility: 0.023, seasonality: 0.06, floor: 8 } }),
+  'ttf-may27': m({ id: 'ttf-may27', name: 'TTF May 2027', symbol: 'TTF MAY27', tab: 'contracts', path: ['Curve Builder', 'TTF', 'Contracts'], unit: 'EUR/MWh', currency: 'EUR', source: 'ICE Endex TTF May-27', frequency: 'daily', chartKind: 'candlestick', tags: ['gas', 'monthly'], shape: { base: 31.5, drift: -0.01, volatility: 0.022, seasonality: 0.06, floor: 7 } }),
+  'ttf-jun27': m({ id: 'ttf-jun27', name: 'TTF Jun 2027', symbol: 'TTF JUN27', tab: 'contracts', path: ['Curve Builder', 'TTF', 'Contracts'], unit: 'EUR/MWh', currency: 'EUR', source: 'ICE Endex TTF Jun-27', frequency: 'daily', chartKind: 'candlestick', tags: ['gas', 'monthly'], shape: { base: 30.2, drift: -0.01, volatility: 0.022, seasonality: 0.06, floor: 7 } }),
+  'ttf-jul27': m({ id: 'ttf-jul27', name: 'TTF Jul 2027', symbol: 'TTF JUL27', tab: 'contracts', path: ['Curve Builder', 'TTF', 'Contracts'], unit: 'EUR/MWh', currency: 'EUR', source: 'ICE Endex TTF Jul-27', frequency: 'daily', chartKind: 'candlestick', tags: ['gas', 'monthly'], shape: { base: 29.5, drift: -0.01, volatility: 0.022, seasonality: 0.06, floor: 7 } }),
+  'ttf-aug27': m({ id: 'ttf-aug27', name: 'TTF Aug 2027', symbol: 'TTF AUG27', tab: 'contracts', path: ['Curve Builder', 'TTF', 'Contracts'], unit: 'EUR/MWh', currency: 'EUR', source: 'ICE Endex TTF Aug-27', frequency: 'daily', chartKind: 'candlestick', tags: ['gas', 'monthly'], shape: { base: 29.0, drift: -0.01, volatility: 0.022, seasonality: 0.06, floor: 7 } }),
+  'ttf-sep27': m({ id: 'ttf-sep27', name: 'TTF Sep 2027', symbol: 'TTF SEP27', tab: 'contracts', path: ['Curve Builder', 'TTF', 'Contracts'], unit: 'EUR/MWh', currency: 'EUR', source: 'ICE Endex TTF Sep-27', frequency: 'daily', chartKind: 'candlestick', tags: ['gas', 'monthly'], shape: { base: 30.8, drift: -0.01, volatility: 0.023, seasonality: 0.07, floor: 7 } }),
+  'ttf-oct27': m({ id: 'ttf-oct27', name: 'TTF Oct 2027', symbol: 'TTF OCT27', tab: 'contracts', path: ['Curve Builder', 'TTF', 'Contracts'], unit: 'EUR/MWh', currency: 'EUR', source: 'ICE Endex TTF Oct-27', frequency: 'daily', chartKind: 'candlestick', tags: ['gas', 'monthly'], shape: { base: 33.0, drift: -0.01, volatility: 0.024, seasonality: 0.07, floor: 8 } }),
+  'ttf-nov27': m({ id: 'ttf-nov27', name: 'TTF Nov 2027', symbol: 'TTF NOV27', tab: 'contracts', path: ['Curve Builder', 'TTF', 'Contracts'], unit: 'EUR/MWh', currency: 'EUR', source: 'ICE Endex TTF Nov-27', frequency: 'daily', chartKind: 'candlestick', tags: ['gas', 'monthly'], shape: { base: 35.5, drift: -0.01, volatility: 0.025, seasonality: 0.07, floor: 8 } }),
+  'ttf-dec27': m({ id: 'ttf-dec27', name: 'TTF Dec 2027', symbol: 'TTF DEC27', tab: 'contracts', path: ['Curve Builder', 'TTF', 'Contracts'], unit: 'EUR/MWh', currency: 'EUR', source: 'ICE Endex TTF Dec-27', frequency: 'daily', chartKind: 'candlestick', tags: ['gas', 'monthly'], shape: { base: 37.8, drift: -0.01, volatility: 0.026, seasonality: 0.08, floor: 8 } }),
+  'ttf-roll-jan27': m({ id: 'ttf-roll-jan27', name: 'TTF Roll Jan 2027', symbol: 'TTF R JAN27', tab: 'contracts', path: ['Curve Builder', 'TTF', 'Rolling'], unit: 'EUR/MWh', currency: 'EUR', source: 'ICE Endex TTF Roll Jan-27', frequency: 'daily', chartKind: 'line', tags: ['gas', 'rolling'], shape: { base: 37.2, drift: -0.01, volatility: 0.024, seasonality: 0.07, floor: 8 } }),
+  'ttf-roll-feb27': m({ id: 'ttf-roll-feb27', name: 'TTF Roll Feb 2027', symbol: 'TTF R FEB27', tab: 'contracts', path: ['Curve Builder', 'TTF', 'Rolling'], unit: 'EUR/MWh', currency: 'EUR', source: 'ICE Endex TTF Roll Feb-27', frequency: 'daily', chartKind: 'line', tags: ['gas', 'rolling'], shape: { base: 36.5, drift: -0.01, volatility: 0.024, seasonality: 0.07, floor: 8 } }),
+  'ttf-roll-mar27': m({ id: 'ttf-roll-mar27', name: 'TTF Roll Mar 2027', symbol: 'TTF R MAR27', tab: 'contracts', path: ['Curve Builder', 'TTF', 'Rolling'], unit: 'EUR/MWh', currency: 'EUR', source: 'ICE Endex TTF Roll Mar-27', frequency: 'daily', chartKind: 'line', tags: ['gas', 'rolling'], shape: { base: 34.8, drift: -0.01, volatility: 0.023, seasonality: 0.07, floor: 8 } }),
+  'ttf-roll-apr27': m({ id: 'ttf-roll-apr27', name: 'TTF Roll Apr 2027', symbol: 'TTF R APR27', tab: 'contracts', path: ['Curve Builder', 'TTF', 'Rolling'], unit: 'EUR/MWh', currency: 'EUR', source: 'ICE Endex TTF Roll Apr-27', frequency: 'daily', chartKind: 'line', tags: ['gas', 'rolling'], shape: { base: 32.8, drift: -0.01, volatility: 0.022, seasonality: 0.06, floor: 7 } }),
+  'ttf-roll-may27': m({ id: 'ttf-roll-may27', name: 'TTF Roll May 2027', symbol: 'TTF R MAY27', tab: 'contracts', path: ['Curve Builder', 'TTF', 'Rolling'], unit: 'EUR/MWh', currency: 'EUR', source: 'ICE Endex TTF Roll May-27', frequency: 'daily', chartKind: 'line', tags: ['gas', 'rolling'], shape: { base: 31.2, drift: -0.01, volatility: 0.022, seasonality: 0.06, floor: 7 } }),
+  'ttf-roll-jun27': m({ id: 'ttf-roll-jun27', name: 'TTF Roll Jun 2027', symbol: 'TTF R JUN27', tab: 'contracts', path: ['Curve Builder', 'TTF', 'Rolling'], unit: 'EUR/MWh', currency: 'EUR', source: 'ICE Endex TTF Roll Jun-27', frequency: 'daily', chartKind: 'line', tags: ['gas', 'rolling'], shape: { base: 29.9, drift: -0.01, volatility: 0.021, seasonality: 0.06, floor: 7 } }),
+  'ttf-roll-jul27': m({ id: 'ttf-roll-jul27', name: 'TTF Roll Jul 2027', symbol: 'TTF R JUL27', tab: 'contracts', path: ['Curve Builder', 'TTF', 'Rolling'], unit: 'EUR/MWh', currency: 'EUR', source: 'ICE Endex TTF Roll Jul-27', frequency: 'daily', chartKind: 'line', tags: ['gas', 'rolling'], shape: { base: 29.2, drift: -0.01, volatility: 0.021, seasonality: 0.06, floor: 7 } }),
+  'ttf-roll-aug27': m({ id: 'ttf-roll-aug27', name: 'TTF Roll Aug 2027', symbol: 'TTF R AUG27', tab: 'contracts', path: ['Curve Builder', 'TTF', 'Rolling'], unit: 'EUR/MWh', currency: 'EUR', source: 'ICE Endex TTF Roll Aug-27', frequency: 'daily', chartKind: 'line', tags: ['gas', 'rolling'], shape: { base: 28.7, drift: -0.01, volatility: 0.021, seasonality: 0.06, floor: 7 } }),
+  'ttf-roll-sep27': m({ id: 'ttf-roll-sep27', name: 'TTF Roll Sep 2027', symbol: 'TTF R SEP27', tab: 'contracts', path: ['Curve Builder', 'TTF', 'Rolling'], unit: 'EUR/MWh', currency: 'EUR', source: 'ICE Endex TTF Roll Sep-27', frequency: 'daily', chartKind: 'line', tags: ['gas', 'rolling'], shape: { base: 30.5, drift: -0.01, volatility: 0.022, seasonality: 0.07, floor: 7 } }),
+  'ttf-roll-oct27': m({ id: 'ttf-roll-oct27', name: 'TTF Roll Oct 2027', symbol: 'TTF R OCT27', tab: 'contracts', path: ['Curve Builder', 'TTF', 'Rolling'], unit: 'EUR/MWh', currency: 'EUR', source: 'ICE Endex TTF Roll Oct-27', frequency: 'daily', chartKind: 'line', tags: ['gas', 'rolling'], shape: { base: 32.7, drift: -0.01, volatility: 0.023, seasonality: 0.07, floor: 8 } }),
+  'ttf-roll-nov27': m({ id: 'ttf-roll-nov27', name: 'TTF Roll Nov 2027', symbol: 'TTF R NOV27', tab: 'contracts', path: ['Curve Builder', 'TTF', 'Rolling'], unit: 'EUR/MWh', currency: 'EUR', source: 'ICE Endex TTF Roll Nov-27', frequency: 'daily', chartKind: 'line', tags: ['gas', 'rolling'], shape: { base: 35.2, drift: -0.01, volatility: 0.024, seasonality: 0.07, floor: 8 } }),
+  'ttf-roll-dec27': m({ id: 'ttf-roll-dec27', name: 'TTF Roll Dec 2027', symbol: 'TTF R DEC27', tab: 'contracts', path: ['Curve Builder', 'TTF', 'Rolling'], unit: 'EUR/MWh', currency: 'EUR', source: 'ICE Endex TTF Roll Dec-27', frequency: 'daily', chartKind: 'line', tags: ['gas', 'rolling'], shape: { base: 37.5, drift: -0.01, volatility: 0.025, seasonality: 0.08, floor: 8 } }),
 };
 
 // -----------------------------------------------------------------------------
 // Leaf helper — builds a TreeNode from a series id (caption = unit).
 // -----------------------------------------------------------------------------
-function leaf(seriesId: string, labelOverride?: string): TreeNode {
+function leaf(seriesId: string, labelOverride?: string, idSuffix?: string): TreeNode {
   const s = SERIES[seriesId];
   return {
-    id: `n-${seriesId}`,
+    id: idSuffix ? `n-${seriesId}-${idSuffix}` : `n-${seriesId}`,
     label: labelOverride ?? s.name,
     caption: s.unit,
     seriesId,
     badge: s.status === 'forbidden' ? 'locked' : s.status === 'missing' ? 'n/a' : undefined,
   };
 }
+
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+interface StripSpec {
+  idPrefix: string;
+  name: string;
+  symbol: string;
+  unit: string;
+  currency: string;
+  source: string;
+  base: string;
+  slope: number;
+  group: string;
+}
+
+/**
+ * Registers `count` monthly contracts as real series and returns their tree
+ * nodes. A production forward curve carries thirty to fifty of these, which is
+ * the case the tree's "show more" affordance exists for: every contract is a
+ * distinct, chartable series, so the list cannot be shortened by de-duplicating.
+ */
+function curveStrip(spec: StripSpec, count: number, startYear = 2027): TreeNode[] {
+  const nodes: TreeNode[] = [];
+  for (let i = 0; i < count; i += 1) {
+    const year = startYear + Math.floor(i / 12);
+    const mon = MONTHS[i % 12];
+    const yy = String(year).slice(2);
+    const id = `${spec.idPrefix}-${mon.toLowerCase()}${yy}`;
+    SERIES[id] = m({
+      id,
+      name: `${spec.name} ${mon} ${year}`,
+      symbol: `${spec.symbol} ${mon.toUpperCase()}${yy}`,
+      tab: 'contracts',
+      path: [spec.group, 'Contracts'],
+      unit: spec.unit,
+      currency: spec.currency,
+      source: `${spec.source} ${mon}-${yy}`,
+      frequency: 'daily',
+      chartKind: 'line',
+      tags: ['monthly', 'curve'],
+      shape: {
+        base: Number(spec.base) - i * spec.slope,
+        drift: 0.03,
+        volatility: 0.014,
+        seasonality: 0.04,
+        floor: 1,
+      },
+    });
+    nodes.push(leaf(id, `${mon} ${yy}`));
+  }
+  return nodes;
+}
+
+const CURVE_BRENT_C: StripSpec = {
+  idPrefix: 'cb-brent-c', name: 'Brent Curve', symbol: 'BRN C', unit: 'USD/bbl', currency: 'USD',
+  source: 'ICE Brent curve', base: '81.5', slope: 0.14, group: 'Curve Builder',
+};
+const CURVE_BRENT_R: StripSpec = {
+  idPrefix: 'cb-brent-r', name: 'Brent Roll', symbol: 'BRN R', unit: 'USD/bbl', currency: 'USD',
+  source: 'ICE Brent roll', base: '81.1', slope: 0.13, group: 'Curve Builder',
+};
+const CURVE_WTI_C: StripSpec = {
+  idPrefix: 'cw-wti-c', name: 'WTI Curve', symbol: 'CL C', unit: 'USD/bbl', currency: 'USD',
+  source: 'NYMEX WTI curve', base: '77.8', slope: 0.12, group: 'WTI Forward Curve',
+};
+const CURVE_WTI_R: StripSpec = {
+  idPrefix: 'cw-wti-r', name: 'WTI Roll', symbol: 'CL R', unit: 'USD/bbl', currency: 'USD',
+  source: 'NYMEX WTI roll', base: '77.4', slope: 0.11, group: 'WTI Forward Curve',
+};
+const CURVE_TTF_C: StripSpec = {
+  idPrefix: 'ct-ttf-c', name: 'TTF Curve', symbol: 'TTF C', unit: 'EUR/MWh', currency: 'EUR',
+  source: 'ICE Endex TTF curve', base: '31.4', slope: 0.06, group: 'TTF Forward Curve',
+};
+const CURVE_TTF_R: StripSpec = {
+  idPrefix: 'ct-ttf-r', name: 'TTF Roll', symbol: 'TTF R', unit: 'EUR/MWh', currency: 'EUR',
+  source: 'ICE Endex TTF roll', base: '31.1', slope: 0.05, group: 'TTF Forward Curve',
+};
 
 // -----------------------------------------------------------------------------
 // TREES — one per tab. Max 10 parents each.
@@ -497,6 +625,83 @@ export const TREES: Record<TabId, TreeNode[]> = {
     { id: 'f-freight', label: 'Freight', icon: 'globe', children: [leaf('baltic')] },
   ],
   contracts: [
+    {
+      id: 'c-curve', label: 'Curve Builder', icon: 'git-branch',
+      children: [
+        {
+          id: 'c-curve-brent', label: 'Brent',
+          children: [
+            {
+              id: 'c-curve-brent-m1', label: 'M+1', seriesId: 'brent-fm',
+              children: [
+                { id: 'c-brent-m1-contracts', label: 'Contracts', lazy: true, children: curveStrip(CURVE_BRENT_C, 30) },
+                { id: 'c-brent-m1-rolling', label: 'Rolling Contracts', lazy: true, children: curveStrip(CURVE_BRENT_R, 30) },
+              ],
+            },
+            {
+              id: 'c-curve-brent-m2', label: 'M+2', seriesId: 'brent-c1',
+              children: [
+                { id: 'c-brent-m2-contracts', label: 'Contracts', lazy: true, children: [leaf('brent-jan27', 'Jan 27 (M+2)', 'm2'), leaf('brent-feb27', 'Feb 27 (M+2)', 'm2')] },
+                { id: 'c-brent-m2-rolling', label: 'Rolling Contracts', lazy: true, children: [leaf('brent-roll-jan27', 'Jan 27 Roll (M+2)', 'm2'), leaf('brent-roll-feb27', 'Feb 27 Roll (M+2)', 'm2')] },
+              ],
+            },
+          ],
+        },
+        {
+          id: 'c-curve-ttf', label: 'TTF',
+          children: [
+            {
+              id: 'c-curve-ttf-m1', label: 'M+1', seriesId: 'ttf-cal26',
+              children: [
+                { id: 'c-ttf-m1-contracts', label: 'Contracts', lazy: true, children: [leaf('ttf-jan27'), leaf('ttf-feb27'), leaf('ttf-mar27'), leaf('ttf-apr27'), leaf('ttf-may27'), leaf('ttf-jun27'), leaf('ttf-jul27'), leaf('ttf-aug27'), leaf('ttf-sep27'), leaf('ttf-oct27'), leaf('ttf-nov27'), leaf('ttf-dec27')] },
+                { id: 'c-ttf-m1-rolling', label: 'Rolling Contracts', lazy: true, children: [leaf('ttf-roll-jan27'), leaf('ttf-roll-feb27'), leaf('ttf-roll-mar27'), leaf('ttf-roll-apr27'), leaf('ttf-roll-may27'), leaf('ttf-roll-jun27'), leaf('ttf-roll-jul27'), leaf('ttf-roll-aug27'), leaf('ttf-roll-sep27'), leaf('ttf-roll-oct27'), leaf('ttf-roll-nov27'), leaf('ttf-roll-dec27')] },
+              ],
+            },
+            {
+              id: 'c-curve-ttf-m2', label: 'M+2', seriesId: 'ttf-q127',
+              children: [
+                { id: 'c-ttf-m2-contracts', label: 'Contracts', lazy: true, children: [leaf('ttf-jan27', 'Jan 27 (M+2)', 'm2'), leaf('ttf-feb27', 'Feb 27 (M+2)', 'm2')] },
+                { id: 'c-ttf-m2-rolling', label: 'Rolling Contracts', lazy: true, children: [leaf('ttf-roll-jan27', 'Jan 27 Roll (M+2)', 'm2'), leaf('ttf-roll-feb27', 'Feb 27 Roll (M+2)', 'm2')] },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+    {
+      id: 'c-curve-wti', label: 'WTI Forward Curve', icon: 'git-branch',
+      children: [
+        {
+          id: 'c-curve-wti-root', label: 'WTI',
+          children: [
+            {
+              id: 'c-curve-wti-m1', label: 'M+1', seriesId: 'wti-c1',
+              children: [
+                { id: 'c-wti-m1-contracts', label: 'Contracts', lazy: true, children: curveStrip(CURVE_WTI_C, 40) },
+                { id: 'c-wti-m1-rolling', label: 'Rolling Contracts', lazy: true, children: curveStrip(CURVE_WTI_R, 40) },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+    {
+      id: 'c-curve-ttf-fwd', label: 'TTF Forward Curve', icon: 'git-branch',
+      children: [
+        {
+          id: 'c-curve-ttf-fwd-root', label: 'TTF',
+          children: [
+            {
+              id: 'c-curve-ttf-fwd-m1', label: 'M+1', seriesId: 'ttf-cal26',
+              children: [
+                { id: 'c-ttffwd-m1-contracts', label: 'Contracts', lazy: true, children: curveStrip(CURVE_TTF_C, 50) },
+                { id: 'c-ttffwd-m1-rolling', label: 'Rolling Contracts', lazy: true, children: curveStrip(CURVE_TTF_R, 50) },
+              ],
+            },
+          ],
+        },
+      ],
+    },
     {
       id: 'c-abs', label: 'Absolute Contracts', icon: 'file',
       children: [leaf('brent-fm'), leaf('ttf-cal26'), leaf('wti-cal26')],

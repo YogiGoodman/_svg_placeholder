@@ -7,6 +7,7 @@ const SIZES_KEY = 'tschart.panelSizes';
 const DOCK_KEY = 'tschart.dock';
 
 export type Viewport = 'large' | 'medium' | 'small';
+export type RightView = 'details' | 'dxTree';
 
 interface PanelSizes {
   left: number;
@@ -19,10 +20,12 @@ interface DockState {
   leftCollapsed: boolean;
   /** Right inspector. Persisted; CLOSED by default. */
   rightCollapsed: boolean;
+  /** Which view the right dock shows. */
+  rightView: RightView;
 }
 
 const DEFAULT_SIZES: PanelSizes = { left: 22, center: 56, right: 22 };
-const DEFAULT_DOCK: DockState = { leftCollapsed: false, rightCollapsed: true };
+const DEFAULT_DOCK: DockState = { leftCollapsed: false, rightCollapsed: true, rightView: 'details' };
 
 /**
  * Layout state: panel collapse, panel sizes (persisted), responsive viewport,
@@ -41,6 +44,7 @@ export class LayoutService {
   private readonly dock0 = this.readDock();
   readonly leftCollapsed = signal(this.dock0.leftCollapsed);
   readonly rightCollapsed = signal(this.dock0.rightCollapsed);
+  readonly rightView = signal<RightView>(this.dock0.rightView);
   readonly sizes = signal<PanelSizes>(this.readSizes());
 
   /** Responsive viewport bucket derived from CDK BreakpointObserver. */
@@ -66,6 +70,7 @@ export class LayoutService {
       const dock: DockState = {
         leftCollapsed: this.leftCollapsed(),
         rightCollapsed: this.rightCollapsed(),
+        rightView: this.rightView(),
       };
       localStorage.setItem(DOCK_KEY, JSON.stringify(dock));
     });
@@ -79,7 +84,17 @@ export class LayoutService {
   }
   /** Open the series inspector (e.g. from a legend row click). */
   openRight(): void {
+    this.rightView.set('details');
     this.rightCollapsed.set(false);
+  }
+  /** Rail semantics: open with this view, or close if already showing it. */
+  showRight(view: RightView): void {
+    if (!this.rightCollapsed() && this.rightView() === view) {
+      this.rightCollapsed.set(true);
+    } else {
+      this.rightView.set(view);
+      this.rightCollapsed.set(false);
+    }
   }
   closeDrawers(): void {
     this.leftCollapsed.set(true);

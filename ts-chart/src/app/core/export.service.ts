@@ -8,6 +8,7 @@ const KIT_FILES = [
   'CHART_STYLE_GUIDE.md',
   'UX_ENGINEERING_PLAYBOOK.md',
   'WORKSPACE_PERSISTENCE.md',
+  'DEVEXTREME_TREELIST_GUIDE.md',
   'scss/_tokens.scss',
   'scss/_utilities.scss',
   'scss/_reset.scss',

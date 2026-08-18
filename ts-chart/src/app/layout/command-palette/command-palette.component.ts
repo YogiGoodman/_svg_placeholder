@@ -317,7 +317,13 @@ export class CommandPaletteComponent {
         label: 'Toggle details panel',
         icon: 'panel-right',
         shortcut: '⌘.',
-        run: () => this.layout.toggleRight(),
+        run: () => this.layout.showRight('details'),
+      },
+      {
+        id: 'dxtree',
+        label: 'Toggle DevExtreme tree (POC)',
+        icon: 'list-tree',
+        run: () => this.layout.showRight('dxTree'),
       },
       {
         id: 'clear',

@@ -72,7 +72,7 @@ export interface SeriesMeta {
   source: string;
   frequency: Frequency;
   chartKind: ChartKind;
-  description: string;
+  description?: string;
   shape: SeriesShape;
   tags?: string[];
   /** Simulated availability — 'forbidden'/'missing' drive error states. */
@@ -100,8 +100,18 @@ export interface TreeNode {
   caption?: string;
   icon?: string;
   children?: TreeNode[];
-  /** Present only on leaves. */
+  /**
+   * The series this node charts. Usually a leaf, but a group may carry one too
+   * (e.g. Curve Builder › Brent › M+1): the row body charts it and the chevron
+   * alone expands.
+   */
   seriesId?: string;
   /** Simulated state badge on the node. */
   badge?: string;
+  /**
+   * Children arrive from the server the first time this node is expanded, and
+   * are cached from then on. Only contract lists are lazy — the rest of the
+   * taxonomy is known upfront and must render without a round trip.
+   */
+  lazy?: boolean;
 }

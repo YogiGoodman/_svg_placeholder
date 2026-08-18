@@ -14,6 +14,7 @@ design-kit/
   CHART_STYLE_GUIDE.md   ← lightweight-charts v5 styling + chart-mode semantics
   UX_ENGINEERING_PLAYBOOK.md ← 30 transferable trader-facing UX/eng principles + failure log
   WORKSPACE_PERSISTENCE.md   ← workspace state: localStorage now, backend design at scale
+  DEVEXTREME_TREELIST_GUIDE.md ← taking a DevExtreme TreeList to this row spec: DOM, CSS, theming, lazy loading
   scss/
     _tokens.scss         ← all design tokens (dark + light), :root & [data-theme]
     _utilities.scss      ← reusable classes (.ts-btn, .ts-segmented, .ts-badge, …)

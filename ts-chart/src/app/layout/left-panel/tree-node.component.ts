@@ -12,6 +12,7 @@ import { SelectionService } from '../../core/selection.service';
 import { SeriesColorService } from '../../core/series-color.service';
 import { TreeStateService } from '../../core/tree-state.service';
 import { TooltipDirective } from '../../core/tooltip.directive';
+import { TREE_ROW_STYLES } from './tree-row.styles';
 
 /** Recursive tree row. Parents expand/collapse; leaves select a series. */
 @Component({
@@ -46,17 +47,26 @@ import { TooltipDirective } from '../../core/tooltip.directive';
     } @else {
       <button
         class="row parent"
+        [class.is-series]="hasOwnSeries()"
+        [class.is-selected]="hasOwnSeries() && selected()"
         [style.--depth]="depth()"
-        (click)="toggleExpanded()"
+        (click)="activateParent()"
         [attr.aria-expanded]="expanded()"
+        [attr.aria-current]="hasOwnSeries() ? selected() : null"
+        [tsTooltip]="hasOwnSeries() ? leafTip() : ''"
       >
+        <!-- On a group that is also a series the chevron is the only expander:
+             the row body charts the node's own data instead. -->
         <lucide-icon
           class="twist"
           [class.open]="expanded()"
           name="chevron-right"
           [size]="14"
+          (click)="onTwistClick($event)"
         />
-        @if (node().icon) {
+        @if (hasOwnSeries()) {
+          <span class="dot" [style.background]="dotColor()"></span>
+        } @else if (node().icon) {
           <lucide-icon class="folder-ico" [name]="node().icon!" [size]="15" />
         }
         <span class="label ts-truncate">{{ node().label }}</span>
@@ -82,110 +92,7 @@ import { TooltipDirective } from '../../core/tooltip.directive';
       }
     }
   `,
-  styles: [
-    `
-      :host {
-        display: block;
-      }
-      .row {
-        display: flex;
-        align-items: center;
-        gap: var(--ts-space-2);
-        width: 100%;
-        height: var(--ts-row-h);
-        padding-left: calc(var(--ts-space-3) + var(--depth, 0) * 14px);
-        padding-right: var(--ts-space-3);
-        border-radius: var(--ts-radius-sm);
-        color: var(--ts-text-secondary);
-        cursor: pointer;
-        transition: background var(--ts-dur-1) var(--ts-ease),
-          color var(--ts-dur-1) var(--ts-ease);
-      }
-      .row:hover {
-        background: var(--ts-bg-hover);
-        color: var(--ts-text-bright);
-      }
-      .parent {
-        font-weight: var(--ts-fw-medium);
-        color: var(--ts-text);
-      }
-      .twist {
-        color: var(--ts-text-muted);
-        transition: transform var(--ts-dur-2) var(--ts-ease);
-        flex: none;
-      }
-      .twist.open {
-        transform: rotate(90deg);
-      }
-      .folder-ico {
-        color: var(--ts-text-muted);
-        flex: none;
-      }
-      .label {
-        flex: 1;
-        font-size: var(--ts-fs-sm);
-        text-align: left;
-      }
-      .count {
-        font-size: var(--ts-fs-xxs);
-        color: var(--ts-text-faint);
-        font-variant-numeric: tabular-nums;
-      }
-      .sel-badge {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        min-width: 16px;
-        height: 15px;
-        padding: 0 5px;
-        border-radius: var(--ts-radius-pill);
-        background: var(--ts-accent-weak);
-        color: var(--ts-accent-strong);
-        font-size: var(--ts-fs-xxs);
-        font-weight: var(--ts-fw-bold);
-        flex: none;
-      }
-      /* Leaf */
-      .leaf {
-        color: var(--ts-text-secondary);
-      }
-      .dot {
-        width: 7px;
-        height: 7px;
-        border-radius: 50%;
-        flex: none;
-        margin-left: 15px;
-        box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 0%, transparent);
-      }
-      .leaf.is-selected {
-        background: var(--ts-accent-weak);
-        color: var(--ts-text-bright);
-      }
-      .caption {
-        font-size: var(--ts-fs-xxs);
-        color: var(--ts-text-faint);
-      }
-      .node-ic {
-        color: var(--ts-text-muted);
-        flex: none;
-      }
-      .node-ic.locked {
-        color: var(--ts-warn);
-      }
-      .leaf.is-disabled {
-        opacity: 0.65;
-      }
-      .children {
-        animation: reveal var(--ts-dur-2) var(--ts-ease);
-      }
-      @keyframes reveal {
-        from {
-          opacity: 0;
-          transform: translateY(-2px);
-        }
-      }
-    `,
-  ],
+  styles: [TREE_ROW_STYLES],
 })
 export class TreeNodeComponent {
   readonly node = input.required<TreeNode>();
@@ -203,6 +110,25 @@ export class TreeNodeComponent {
   }
 
   readonly isLeaf = computed(() => !this.node().children?.length);
+
+  /** A group that also carries its own series (e.g. Curve Builder › Brent › M+1). */
+  readonly hasOwnSeries = computed(() => !this.isLeaf() && !!this.node().seriesId);
+
+  /**
+   * Row-body click on a group. If the group is itself a series it charts that
+   * series — expanding is then the chevron's job alone, so a trader can preview
+   * M+1 without unfolding twenty-four contracts underneath it.
+   */
+  activateParent(): void {
+    if (this.hasOwnSeries()) this.selectLeaf();
+    else this.toggleExpanded();
+  }
+
+  /** Chevron: expand only, never chart. */
+  onTwistClick(event: MouseEvent): void {
+    event.stopPropagation();
+    this.toggleExpanded();
+  }
 
   readonly selected = computed(() => {
     const id = this.node().seriesId;

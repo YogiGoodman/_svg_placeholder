@@ -1,0 +1,86 @@
+<div class="dxtree">
+  <dx-tree-list
+    [dataSource]="store"
+    keyExpr="id"
+    parentIdExpr="parentId"
+    hasItemsExpr="hasItems"
+    [rootValue]="null"
+    [remoteOperations]="{ filtering: true }"
+    [showColumnHeaders]="false"
+    [showBorders]="false"
+    [showRowLines]="false"
+    [hoverStateEnabled]="false"
+    [expandedRowKeys]="expandedKeys()"
+    height="100%"
+    (onRowClick)="onRowClick($event)"
+  >
+    <dxo-scrolling mode="virtual" [useNative]="true" />
+    <!-- No load panel: it greys out the whole tree, and every branch here is
+         either known upfront or already cached, so it would only ever flash. -->
+    <dxo-load-panel [enabled]="false" />
+    <dxi-column dataField="label" cellTemplate="nodeCell" [allowSorting]="false" />
+
+    <div *dxTemplate="let cell of 'nodeCell'">
+      @if (cell.data.isMore) {
+        <!-- Truncated branch. Not a series and not a group — an affordance row. -->
+        <span class="cell-row more-cell">
+          <span class="more-label">Show {{ cell.data.moreCount }} more</span>
+        </span>
+      } @else if (cell.data.hasItems) {
+        <span
+          class="cell-row parent-cell"
+          [class.is-series]="!!cell.data.seriesId"
+          [class.is-selected]="isSelected(cell.data)"
+          [tsTooltip]="parentTip(cell.data)"
+        >
+          <!-- On a group that is also a series the chevron is the only expander:
+               the row body previews the node's own series instead. -->
+          <lucide-icon
+            class="twist"
+            [class.open]="isNodeExpanded(cell.data.id)"
+            name="chevron-right"
+            [size]="14"
+            (click)="onTwistClick($event, cell.data)"
+          />
+          @if (cell.data.seriesId) {
+            <span class="dot" [style.background]="getDotColor(cell.data)"></span>
+          } @else if (cell.data.icon) {
+            <lucide-icon class="folder-ico" [name]="cell.data.icon" [size]="15" />
+          }
+          <span class="lbl ts-truncate">{{ cell.data.label }}</span>
+          <!-- Collapsed group with active selections underneath: surface it so a
+               hidden selection is never invisible. -->
+          @if (!isNodeExpanded(cell.data.id) && getSelectedInside(cell.data) > 0) {
+            <span
+              class="sel-badge ts-mono"
+              [tsTooltip]="getSelectedInside(cell.data) + ' selected in this group'"
+            >
+              {{ getSelectedInside(cell.data) }}
+            </span>
+          }
+          <span class="count">{{ getLeafCount(cell.data) }}</span>
+        </span>
+      } @else {
+        <span
+          class="cell-row leaf-cell"
+          [class.is-selected]="isSelected(cell.data)"
+          [class.is-disabled]="isDisabled(cell.data)"
+          [tsTooltip]="leafTip(cell.data)"
+        >
+          <span class="dot" [style.background]="getDotColor(cell.data)"></span>
+          <span class="lbl ts-truncate">{{ cell.data.label }}</span>
+          @if (cell.data.badge) {
+            <lucide-icon
+              class="node-ic"
+              [class.locked]="cell.data.badge === 'locked'"
+              [name]="cell.data.badge === 'locked' ? 'lock' : 'triangle-alert'"
+              [size]="12"
+            />
+          } @else if (cell.data.caption) {
+            <span class="uom ts-mono">{{ cell.data.caption }}</span>
+          }
+        </span>
+      }
+    </div>
+  </dx-tree-list>
+</div>

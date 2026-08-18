@@ -5,6 +5,7 @@ import { TooltipDirective } from '../../core/tooltip.directive';
 import { LeftPanelComponent } from '../left-panel/left-panel.component';
 import { ChartPanelComponent } from '../center-panel/chart-panel.component';
 import { InfoPanelComponent } from '../right-panel/info-panel.component';
+import { DxBrowsePanelComponent } from '../right-panel/dx-tree/dx-browse-panel.component';
 
 /**
  * Chart-first shell: a slim icon rail + docked chrome + the chart card. The tree
@@ -24,6 +25,7 @@ import { InfoPanelComponent } from '../right-panel/info-panel.component';
     LeftPanelComponent,
     ChartPanelComponent,
     InfoPanelComponent,
+    DxBrowsePanelComponent,
   ],
   template: `
     <div class="shell">
@@ -40,12 +42,21 @@ import { InfoPanelComponent } from '../right-panel/info-panel.component';
         </button>
         <button
           class="rail__btn"
-          [class.is-active]="!layout.rightCollapsed()"
-          (click)="layout.toggleRight()"
+          [class.is-active]="!layout.rightCollapsed() && layout.rightView() === 'details'"
+          (click)="layout.showRight('details')"
           tsTooltip="Series details (⌘.)"
-          [attr.aria-expanded]="!layout.rightCollapsed()"
+          [attr.aria-expanded]="!layout.rightCollapsed() && layout.rightView() === 'details'"
         >
           <lucide-icon name="info" [size]="18" />
+        </button>
+        <button
+          class="rail__btn"
+          [class.is-active]="!layout.rightCollapsed() && layout.rightView() === 'dxTree'"
+          (click)="layout.showRight('dxTree')"
+          tsTooltip="DevExtreme tree (POC)"
+          [attr.aria-expanded]="!layout.rightCollapsed() && layout.rightView() === 'dxTree'"
+        >
+          <lucide-icon name="list-tree" [size]="18" />
         </button>
       </nav>
 
@@ -60,10 +71,17 @@ import { InfoPanelComponent } from '../right-panel/info-panel.component';
         <app-chart-panel />
       </div>
 
-      <!-- Right dock: series inspector (non-modal, in-flow) -->
+      <!-- Right dock: series inspector or DX tree (non-modal, in-flow) -->
       @if (!layout.rightCollapsed()) {
         <aside class="dock dock--right">
-          <app-info-panel (close)="layout.toggleRight()" />
+          @switch (layout.rightView()) {
+            @case ('details') {
+              <app-info-panel (close)="layout.toggleRight()" />
+            }
+            @case ('dxTree') {
+              <app-dx-browse-panel (close)="layout.toggleRight()" />
+            }
+          }
         </aside>
       }
     </div>

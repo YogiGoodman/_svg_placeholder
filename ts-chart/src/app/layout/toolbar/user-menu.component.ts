@@ -11,6 +11,7 @@ import { LucideAngularModule } from 'lucide-angular';
 import { Density, ThemeService } from '../../core/theme.service';
 import { LayoutService } from '../../core/layout.service';
 import { SelectionService } from '../../core/selection.service';
+import { TreeStateService } from '../../core/tree-state.service';
 import { ExportService } from '../../core/export.service';
 
 /** Popover surface: identity, version, and quick preferences. */
@@ -86,6 +87,27 @@ import { ExportService } from '../../core/export.service';
             <button [class.is-active]="sel.hoverCard()" (click)="sel.hoverCard.set(true)">
               On
             </button>
+          </div>
+        </div>
+      </div>
+
+      <hr class="ts-divider" />
+
+      <div class="group">
+        <span class="group__label">Tree</span>
+        <div class="pref pref--col">
+          <span class="pref__label">
+            <lucide-icon name="list-tree" [size]="15" /> Children before "show more"
+          </span>
+          <div class="ts-segmented">
+            @for (n of childLimitOptions; track n) {
+              <button
+                [class.is-active]="tree.childLimit() === n"
+                (click)="tree.setChildLimit(n)"
+              >
+                {{ n === 0 ? 'All' : n }}
+              </button>
+            }
           </div>
         </div>
       </div>
@@ -246,10 +268,13 @@ export class UserMenuComponent {
 
   readonly theme = inject(ThemeService);
   readonly sel = inject(SelectionService);
+  readonly tree = inject(TreeStateService);
   private readonly layout = inject(LayoutService);
   private readonly exportSvc = inject(ExportService);
 
   readonly maxOptions = [4, 6, 8, 10, 12];
+  /** 0 = no cap. A long curve is unreadable long before it is slow. */
+  readonly childLimitOptions = [8, 12, 20, 0];
   readonly exporting = signal(false);
 
   setDensity(d: Density): void {

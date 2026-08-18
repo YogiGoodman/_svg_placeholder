@@ -30,6 +30,16 @@
               }
             ],
             "styles": [
+              {
+                "input": "node_modules/devextreme/dist/css/dx.light.css",
+                "bundleName": "dx.light",
+                "inject": false
+              },
+              {
+                "input": "node_modules/devextreme/dist/css/dx.dark.css",
+                "bundleName": "dx.dark",
+                "inject": false
+              },
               "src/styles.scss"
             ]
           },
@@ -38,8 +48,8 @@
               "budgets": [
                 {
                   "type": "initial",
-                  "maximumWarning": "900kB",
-                  "maximumError": "1.5MB"
+                  "maximumWarning": "4MB",
+                  "maximumError": "5MB"
                 },
                 {
                   "type": "anyComponentStyle",
@@ -88,6 +98,16 @@
               }
             ],
             "styles": [
+              {
+                "input": "node_modules/devextreme/dist/css/dx.light.css",
+                "bundleName": "dx.light",
+                "inject": false
+              },
+              {
+                "input": "node_modules/devextreme/dist/css/dx.dark.css",
+                "bundleName": "dx.dark",
+                "inject": false
+              },
               "src/styles.scss"
             ]
           }

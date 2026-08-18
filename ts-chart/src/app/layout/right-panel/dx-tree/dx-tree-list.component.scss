@@ -1,0 +1,232 @@
+// ---------------------------------------------------------------------------
+// DevExtreme TreeList → in-house row spec.
+//
+// Scoped under `.dxtree` (the component uses ViewEncapsulation.None so the rules
+// reach DevExtreme's own DOM). Nothing here uses `!important`: each selector
+// mirrors the depth of the DevExtreme rule it replaces and adds `.dxtree` in
+// front, so it wins by exactly one class.
+//
+// Colors come from the DevExtreme theme swapped in `dx-theme.ts` (generic.dark /
+// generic.light); this file only re-points the surfaces the app owns at its own
+// tokens. See DEVEXTREME_TREELIST_GUIDE.md for the cell DOM this is written against.
+//
+// Geometry contract (identical to the hand-rolled tree in tree-row.styles.ts):
+//   base padding var(--ts-space-3) · indent 14px per level · row var(--ts-row-h)
+// ---------------------------------------------------------------------------
+
+.dxtree {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+// --- 1. Surface -------------------------------------------------------------
+// The DevExtreme theme paints its own page and grid backgrounds (#2a2a2a in the
+// dark theme). Hand those pixels back to the panel so the tree sits on the app's
+// surface rather than a grey slab.
+.dxtree .dx-widget {
+  font-family: var(--ts-font-sans);
+  font-size: var(--ts-fs-sm);
+  color: var(--ts-text-secondary);
+  background: transparent;
+}
+.dxtree .dx-treelist,
+.dxtree .dx-treelist-container > .dx-treelist-rowsview {
+  background: transparent;
+  border: none;
+}
+
+// The widget's empty state is themed, never hidden — a tree that renders nothing
+// still has to say so.
+.dxtree .dx-treelist-nodata {
+  color: var(--ts-text-muted);
+  font-size: var(--ts-fs-sm);
+  background: transparent;
+}
+
+// --- 2. Row geometry --------------------------------------------------------
+.dxtree .dx-treelist .dx-treelist-rowsview .dx-row > td {
+  height: var(--ts-row-h);
+  padding: 0 var(--ts-space-3);
+  border: none;
+  border-radius: var(--ts-radius-sm);
+  cursor: pointer;
+  transition: background var(--ts-dur-1) var(--ts-ease),
+              color var(--ts-dur-1) var(--ts-ease);
+}
+
+// The cell holding the tree column becomes the row's flex track:
+// [indent spacers][cell content].
+.dxtree .dx-treelist .dx-treelist-rowsview .dx-row > td.dx-treelist-cell-expandable {
+  display: flex;
+  align-items: center;
+}
+
+// --- 3. Indentation ---------------------------------------------------------
+// DevExtreme renders `level + 1` spacer divs inside `.dx-treelist-icon-container`
+// — one per ancestor level, plus a trailing "--last" slot carrying its expand
+// glyph. That container IS the indentation: hiding it to remove the glyph
+// flattens the entire tree. Keep it, retune the spacer to the design step, and
+// collapse only the glyph slot, since the cell template draws its own chevron.
+.dxtree .dx-treelist-rowsview .dx-row > td.dx-treelist-cell-expandable .dx-treelist-icon-container {
+  flex: none;
+  height: auto;
+}
+.dxtree .dx-treelist-rowsview .dx-row > td.dx-treelist-cell-expandable .dx-treelist-empty-space {
+  width: 14px;
+  margin: 0;
+}
+.dxtree .dx-treelist-rowsview .dx-row > td.dx-treelist-cell-expandable .dx-treelist-empty-space--last {
+  width: 0;
+  margin: 0;
+}
+// The glyph is an absolutely positioned ::before, so zero width does not remove
+// it — drop the generated content instead.
+.dxtree .dx-treelist-rowsview .dx-row > td.dx-treelist-cell-expandable .dx-treelist-collapsed::before,
+.dxtree .dx-treelist-rowsview .dx-row > td.dx-treelist-cell-expandable .dx-treelist-expanded::before {
+  content: none;
+}
+
+// --- 4. Cell content chain --------------------------------------------------
+// Two wrappers sit between the cell and the template's markup, and BOTH
+// shrink-wrap unless told otherwise — leaving trailing content (unit, count)
+// stranded beside the label instead of at the row's right edge:
+//
+//   td › .dx-treelist-text-content › .dx-template-wrapper › .cell-row
+//
+// `.dx-treelist-text-content` is DevExtreme's (themed `inline-block`, by a rule
+// five classes deep). `.dx-template-wrapper` is inserted by devextreme-angular
+// around every *dxTemplate render and carries no styling at all.
+.dxtree .dx-treelist-rowsview .dx-treelist-table:not(.dx-treelist-table-fixed) .dx-treelist-cell-expandable .dx-treelist-text-content,
+.dxtree .dx-treelist-rowsview .dx-treelist-best-fit.dx-treelist-cell-expandable .dx-treelist-text-content,
+.dxtree .dx-treelist-rowsview .dx-row > td .dx-treelist-text-content,
+.dxtree .dx-treelist-rowsview .dx-row > td .dx-template-wrapper {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+}
+
+.dxtree .cell-row {
+  display: flex;
+  align-items: center;
+  gap: var(--ts-space-2);
+  width: 100%;
+  min-width: 0;
+}
+
+// --- 5. Row states ----------------------------------------------------------
+// Selection lives in the app's own service, so DevExtreme never applies
+// `.dx-selection` (no dxo-selection is configured). The cell template flags
+// itself and the row reacts, which keeps the highlight reactive to signals with
+// no repaintRows() call — and spans the indent area, as the native tree does.
+.dxtree .dx-treelist-rowsview .dx-data-row > td:hover {
+  background: var(--ts-bg-hover);
+  color: var(--ts-text-bright);
+}
+.dxtree .dx-treelist-rowsview .dx-data-row > td:has(.cell-row.is-selected),
+.dxtree .dx-treelist-rowsview .dx-data-row > td:has(.cell-row.is-selected):hover {
+  background: var(--ts-accent-weak);
+  color: var(--ts-text-bright);
+}
+
+// --- 6. Cell content --------------------------------------------------------
+.dxtree .twist {
+  color: var(--ts-text-muted);
+  transition: transform var(--ts-dur-2) var(--ts-ease);
+  flex: none;
+}
+.dxtree .twist.open {
+  transform: rotate(90deg);
+}
+// On a node that is both a series and a group the chevron is the only expander
+// (the row body charts the node), so it needs a hit area of its own.
+.dxtree .parent-cell.is-series .twist {
+  margin: 0 -2px;
+  padding: 0 2px;
+  border-radius: var(--ts-radius-sm);
+}
+.dxtree .parent-cell.is-series .twist:hover {
+  color: var(--ts-text-bright);
+  background: var(--ts-bg-active);
+}
+
+.dxtree .cell-row .lbl {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--ts-fs-sm);
+  text-align: left;
+}
+.dxtree .cell-row .dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: none;
+}
+.dxtree .cell-row .folder-ico,
+.dxtree .cell-row .node-ic {
+  color: var(--ts-text-muted);
+  flex: none;
+}
+.dxtree .cell-row .node-ic.locked {
+  color: var(--ts-warn);
+}
+
+.dxtree .parent-cell {
+  font-weight: var(--ts-fw-medium);
+  color: var(--ts-text);
+}
+.dxtree .parent-cell .count {
+  font-size: var(--ts-fs-xxs);
+  color: var(--ts-text-faint);
+  font-variant-numeric: tabular-nums;
+  flex: none;
+}
+.dxtree .parent-cell .sel-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 15px;
+  padding: 0 5px;
+  border-radius: var(--ts-radius-pill);
+  background: var(--ts-accent-weak);
+  color: var(--ts-accent-strong);
+  font-size: var(--ts-fs-xxs);
+  font-weight: var(--ts-fw-bold);
+  flex: none;
+}
+
+// The "+N more" row closing a truncated branch. It is an action, not data, so it
+// reads in the accent — the same token the sel-badge and active tab use, which
+// carries its own light/dark values and stays legible on both surfaces.
+.dxtree .more-cell {
+  color: var(--ts-accent-strong);
+}
+.dxtree .more-label {
+  /* Aligns with leaf label text: dot margin (15) + dot (7) + row gap (8). */
+  margin-left: 30px;
+  font-size: var(--ts-fs-xs);
+  font-weight: var(--ts-fw-medium);
+  color: inherit;
+}
+.dxtree .dx-data-row > td:hover .more-label {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.dxtree .leaf-cell {
+  color: var(--ts-text-secondary);
+}
+// Leaves have no chevron; the dot takes its place so labels stay on one rail.
+.dxtree .leaf-cell .dot {
+  margin-left: 15px;
+}
+.dxtree .leaf-cell .uom {
+  font-size: var(--ts-fs-xxs);
+  color: var(--ts-text-faint);
+  flex: none;
+  white-space: nowrap;
+}
+.dxtree .leaf-cell.is-disabled {
+  opacity: 0.65;
+}

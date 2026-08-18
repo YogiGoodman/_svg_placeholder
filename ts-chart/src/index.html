@@ -8,6 +8,12 @@
   <meta name="description" content="TS Chart — a clean, dark-first timeseries charting prototype for forecast series, contracts and regional markets.">
   <meta name="color-scheme" content="dark light">
   <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+  <!-- DevExtreme themes. `rel="dx-theme"` is the contract DevExtreme's own theme
+       module reads: it removes these tags at startup and swaps a single active
+       <link> whenever `themes.current(...)` is called. Both files are emitted by
+       angular.json as non-injected style bundles so they stay fetchable by URL. -->
+  <link rel="dx-theme" href="dx.light.css" data-theme="generic.light">
+  <link rel="dx-theme" href="dx.dark.css" data-theme="generic.dark" data-active="true">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
