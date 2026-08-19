@@ -56,7 +56,7 @@ that explain the non-obvious ones.
 Deliberately **not** configured, and why it matters: no `dxo-selection` (the app
 owns selection, so `.dx-selection` never appears — style your own state, §5) and
 no `focusedRowEnabled` (so `.dx-row-focused` never appears). Turning either on
-reintroduces DevExtreme state classes this stylesheet does not override, §6.
+reintroduces DevExtreme state classes this stylesheet does not override, §7.
 
 ---
 
@@ -283,7 +283,7 @@ the same rail as the leaf labels it summarises (`margin-left: 30px` = dot margin
 | Concern | Mechanism |
 |---|---|
 | Data | `buildIndex()` flattens the tree once and precomputes per-parent leaf counts and series ids, so row templates do no recursive work |
-| Expansion | `TreeStateService` → `[expandedRowKeys]`, scoped to the active tree so DevExtreme never sees foreign keys. `onRowExpanding`/`onRowCollapsing` cancel DevExtreme's own transition and toggle the service, so keyboard expansion routes through the same store |
+| Expansion | `TreeStateService` → `[expandedRowKeys]`, scoped to the active tree so DevExtreme never sees foreign keys. `onRowExpanding`/`onRowCollapsing` **cancel** DevExtreme's own transition and toggle the service instead. **This is not optional:** without it, keyboard navigation (→ / ←) and `expandRow()` expand a row in the widget's private state — the chevron keeps pointing right at an open branch, and the next unrelated toggle rewrites `expandedRowKeys` and silently collapses it |
 | Selection | `SelectionService` read in the cell template; `onRowClick` toggles for any node carrying a `seriesId` |
 | Selected highlight | No `dxo-selection` is configured, so DevExtreme never applies `.dx-selection`. The cell flags itself `.is-selected` and the row reacts via `td:has(.cell-row.is-selected)` — reactive to signals, no `repaintRows()`, and the highlight spans the indent area |
 | Dual-role nodes | A node may be both a series and a group. The row body charts its own series; `onTwistClick` stops propagation so the chevron expands without charting. Plain groups toggle from anywhere on the row |
@@ -293,7 +293,58 @@ the same rail as the leaf labels it summarises (`margin-left: 30px` = dot margin
 
 ---
 
-## 6 · Edge cases
+## 6 · What is a workaround, and what is not
+
+Read this before copying. Four things here fight the widget rather than use it,
+and one is a deliberate trade you may want to make differently.
+
+| # | Thing | Why it is here | What it costs you |
+|---|---|---|---|
+| 1 | **`display: flex` on `<td>`** | The indent container and cell content have to share one horizontal track. There is no DevExtreme option for this | Leaves table layout behind. Fine at one column; re-check if you add columns or depend on best-fit width measurement |
+| 2 | **Hiding DevExtreme's expander** (`content: none`, `width: 0`) and drawing a Lucide chevron in the cell template | The widget has no custom-expand-icon API, and its glyphs are two different DXIcons code points, so `transform: rotate()` cannot animate between them | The vendor expander still exists in the DOM at zero width. Harmless, but it is dead weight the widget still reasons about |
+| 3 | **`td:has(.cell-row.is-selected)` for the selected row** | No `dxo-selection` is configured, so `.dx-selection` never appears | See the note below — this is the one worth reconsidering |
+| 4 | **`refresh(true)` to reveal a folded branch** | There is no per-parent invalidation API; `loadDescendants()` explicitly will not reload cached data | Re-asks the store for every visible branch to change one. Cheap because cached branches answer synchronously, but it is heavier than the intent |
+
+Everything else — `CustomStore` + `parentIds`, `hasItemsExpr`, `remoteOperations`,
+`expandedRowKeys`, `cellTemplate`, `loadPanel` — is the documented API used as
+documented.
+
+### The selection trade
+
+Binding selection through the app's own service and styling `:has()` keeps one
+source of truth and avoids a second state to reconcile. The alternative is more
+native and worth considering if you want the widget's own behaviour:
+
+```html
+<dxo-selection mode="multiple" showCheckBoxesMode="none" />
+<!-- [(selectedRowKeys)] bound to your store -->
+```
+
+That gives you `.dx-selection` to style, keyboard selection, and recursive
+parent/child selection for free — at the cost of keeping DevExtreme's selection
+state in step with yours. This app has an ordered, capped selection with colour
+slots, so a second owner was the wrong shape. A simpler app should probably use
+`dxo-selection`.
+
+### Fixture vs. production
+
+Two places where this repo is a demo and production is not:
+
+- **`hasItems` is derived from `children.length`.** That only works because the
+  fixture holds the whole tree. In production it must be a field on the payload —
+  a lazy node's children do not exist when its row is built, so deriving it would
+  render every unloaded branch as a leaf that can never be opened.
+- **`requestChildren()` resolves from the seeded catalog.** It is the only method
+  that changes when this talks to a server. The surrounding machinery — one
+  in-flight request per branch, cache written on arrival, failures deliberately
+  not cached so the next expand retries — is already written for a real call.
+
+There is no retry, backoff, or error row: a rejected load leaves the branch
+closed and the operator can try again. Decide whether that is enough for you.
+
+---
+
+## 7 · Edge cases
 
 - **`ViewEncapsulation.None` is required** — DevExtreme renders outside Angular's
   emulated encapsulation. Scope every rule under one wrapper class; the styles
@@ -346,6 +397,7 @@ the same rail as the leaf labels it summarises (`margin-left: 30px` = dot margin
 - [ ] Disabled / locked / missing leaves: opacity, icon color, tooltip reason
 - [ ] Long label truncation (ellipsis, no reflow)
 - [ ] Chevron rotation (180ms)
+- [ ] Keyboard → / ← expands and collapses, and the chevron agrees with the row
 - [ ] Expanding a group above a contract list never waits on anything
 - [ ] Re-expanding a loaded contract list shows no spinner and refetches nothing
 - [ ] Long branch: 12 children then "Show N more"; revealing keeps expansion and scroll

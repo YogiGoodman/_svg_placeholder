@@ -13,6 +13,8 @@
     [expandedRowKeys]="expandedKeys()"
     height="100%"
     (onRowClick)="onRowClick($event)"
+    (onRowExpanding)="onExpanding($event)"
+    (onRowCollapsing)="onCollapsing($event)"
   >
     <dxo-scrolling mode="virtual" [useNative]="true" />
     <!-- No load panel: it greys out the whole tree, and every branch here is

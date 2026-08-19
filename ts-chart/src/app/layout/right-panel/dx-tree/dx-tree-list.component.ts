@@ -15,7 +15,11 @@ import {
   DxTreeListComponent as DxTreeList,
   DxTreeListModule,
 } from 'devextreme-angular/ui/tree-list';
-import type { RowClickEvent } from 'devextreme/ui/tree_list';
+import type {
+  RowClickEvent,
+  RowCollapsingEvent,
+  RowExpandingEvent,
+} from 'devextreme/ui/tree_list';
 import { LucideAngularModule } from 'lucide-angular';
 import { TreeNode } from '../../../data/models';
 import { SERIES } from '../../../data/series-catalog.data';
@@ -98,6 +102,9 @@ function toRow(node: TreeNode, parentId: string | null): FlatNode {
     id: node.id,
     parentId,
     label: node.label,
+    // Fixture shortcut. In production this MUST come from the payload: a lazy
+    // node's children do not exist when its row is built, so deriving it from
+    // `children.length` would render every unloaded branch as a leaf.
     hasItems: !!node.children?.length,
     caption: node.caption,
     icon: node.icon,
@@ -196,9 +203,9 @@ export class DxTreeListComponent {
   }
 
   /**
-   * Re-ask the store for what is currently on screen. Skipped until the widget
-   * exists so the two setup effects do not each trigger a load before the first
-   * render. `changesOnly` repaints just the rows that differ.
+   * Re-ask the store for what is currently on screen; `changesOnly` repaints
+   * only the rows that differ. A no-op before the widget exists, which is what
+   * keeps the two setup effects from each forcing a load on the first render.
    */
   private reload(): void {
     this.grid()?.instance?.refresh(true);
@@ -222,14 +229,39 @@ export class DxTreeListComponent {
   }
 
   /**
-   * The data call. Resolves from the seeded catalog here; in production this is
-   * the HTTP request, and it is the only place that needs to change. Caching on
-   * the way out is what makes every later read synchronous.
+   * One in-flight request per branch. DevExtreme can ask for the same parent
+   * twice before the first answer lands (a refresh while a load is pending), and
+   * without this that becomes two calls.
+   */
+  private readonly inFlight = new Map<string, Promise<TreeNode[]>>();
+
+  /**
+   * Fetch a lazy branch once. The cache is written when the response *arrives*,
+   * never before, and a failure is not cached — so the next expand retries
+   * instead of showing a branch that is permanently empty.
    */
   private fetchBranch(key: string, node: TreeNode): Promise<TreeNode[]> {
-    const children = node.children ?? [];
-    this.fetched.set(key, children);
-    return Promise.resolve(children);
+    const pending = this.inFlight.get(key);
+    if (pending) return pending;
+
+    const request = this.requestChildren(node)
+      .then((children) => {
+        this.fetched.set(key, children);
+        this.inFlight.delete(key);
+        return children;
+      })
+      .catch((error: unknown) => {
+        this.inFlight.delete(key);
+        throw error;
+      });
+
+    this.inFlight.set(key, request);
+    return request;
+  }
+
+  /** The data call — the only method that changes when this talks to a server. */
+  private requestChildren(node: TreeNode): Promise<TreeNode[]> {
+    return Promise.resolve(node.children ?? []);
   }
 
   /** Cap a branch and close it with the "+N more" affordance when it overflows. */
@@ -326,5 +358,25 @@ export class DxTreeListComponent {
   onTwistClick(event: MouseEvent, row: FlatNode): void {
     event.stopPropagation();
     this.treeState.toggle(row.id);
+  }
+
+  /**
+   * DevExtreme's own expand path — keyboard navigation (→ / ←) and any
+   * `expandRow()` call. Cancelling hands the decision to the service, which then
+   * pushes it back through `[expandedRowKeys]`.
+   *
+   * Without this the widget expands a row in its own private state while the
+   * service knows nothing: the chevron keeps pointing right at an open branch,
+   * and the next unrelated toggle rewrites `expandedRowKeys` and silently
+   * collapses it again. One writer, or the two states drift.
+   */
+  onExpanding(e: RowExpandingEvent<FlatNode, string>): void {
+    e.cancel = true;
+    if (!this.treeState.set().has(e.key)) this.treeState.toggle(e.key);
+  }
+
+  onCollapsing(e: RowCollapsingEvent<FlatNode, string>): void {
+    e.cancel = true;
+    if (this.treeState.set().has(e.key)) this.treeState.toggle(e.key);
   }
 }
