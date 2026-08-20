@@ -130,6 +130,8 @@ const SERIES_DEF: Record<SeriesType, SeriesDefinition<SeriesType>> = {
       (pointerdown)="onPointerDown($event)"
       (pointermove)="onPointerMove($event)"
       (pointerup)="onPointerUp()"
+      (pointercancel)="onPointerUp()"
+      (lostpointercapture)="onPointerUp()"
       (dblclick)="onDblClick()"
     >
       <!-- Fixed left legend: rows only, capital.com-minimal. No header — the
@@ -308,6 +310,12 @@ const SERIES_DEF: Record<SeriesType, SeriesDefinition<SeriesType>> = {
         width: 100%;
         height: 100%;
         min-height: 0;
+        /* Every overlay in here (measure rect + label, right-edge value tags,
+           today marker) is absolutely positioned against this box. In a split
+           layout the panes are flex siblings separated only by a border, so
+           without clipping those overlays paint straight over the neighbouring
+           chart. Clip at the pane edge. */
+        overflow: hidden;
       }
       .chart {
         position: absolute;
@@ -741,6 +749,11 @@ export class ChartViewComponent implements OnDestroy {
   /** Shift+drag measurement rect in host-relative px. */
   readonly measure = signal<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
   private measuring = false;
+  /** Pointer id captured for the active measure drag, so it can be released. */
+  private measurePointerId: number | null = null;
+  /** The element holding that capture — the `.chart-host` wrapper the pointer
+   *  listeners are bound to, NOT the inner `#host` chart mount. */
+  private measureCaptureEl: HTMLElement | null = null;
 
   readonly mLeft = computed(() => Math.min(this.measure()!.x1, this.measure()!.x2));
   readonly mTop = computed(() => Math.min(this.measure()!.y1, this.measure()!.y2));
@@ -1363,7 +1376,16 @@ export class ChartViewComponent implements OnDestroy {
   // --- pointer interactions: measure (Shift+drag), dblclick fit --------------
   onPointerLeave(): void {
     this.pointerInside = false;
+    // A measure drag holds pointer capture, so the crosshair belongs to this
+    // pane until the drag ends even if the cursor has left the pane box.
+    if (this.measuring) return;
     this.interaction.clear(this.paneId());
+  }
+
+  /** Clamp a host-relative coordinate into the pane, so a drag that runs past
+   *  the edge measures to the edge instead of into the neighbouring chart. */
+  private clamp(v: number, max: number): number {
+    return v < 0 ? 0 : v > max ? max : v;
   }
 
   /** Snap x to the nearest bar center (round-trip through the time scale). */
@@ -1379,11 +1401,23 @@ export class ChartViewComponent implements OnDestroy {
   onPointerDown(e: PointerEvent): void {
     if (e.shiftKey && this.chart) {
       const r = this.host().nativeElement.getBoundingClientRect();
+      // The price scale is lightweight-charts' own drag target (axisPressedMouseMove).
+      // Starting a measure there would freeze scaling for a gesture the user meant
+      // for the axis, so leave that strip to the library.
+      const plotW = r.width - this.chart.priceScale('right').width();
+      if (e.clientX - r.left > plotW) return;
+
       this.measureHostW = r.width;
-      const x = this.snapX(e.clientX - r.left);
-      const y = e.clientY - r.top;
+      const x = this.snapX(this.clamp(e.clientX - r.left, r.width));
+      const y = this.clamp(e.clientY - r.top, r.height);
       this.measure.set({ x1: x, y1: y, x2: x, y2: y });
       this.measuring = true;
+      // Capture the pointer so this pane still receives pointermove/up after the
+      // cursor crosses into a sibling pane. Without it the drag's pointerup lands
+      // on the neighbour, this pane never restores pan/zoom, and it stays dead.
+      this.measurePointerId = e.pointerId;
+      this.measureCaptureEl = e.currentTarget as HTMLElement | null;
+      this.measureCaptureEl?.setPointerCapture?.(e.pointerId);
       // Freeze pan/zoom while measuring so the drag draws instead of scrolling.
       this.chart.applyOptions({ handleScroll: false, handleScale: false });
       e.preventDefault();
@@ -1396,17 +1430,34 @@ export class ChartViewComponent implements OnDestroy {
     if (!this.measuring) return;
     const r = this.host().nativeElement.getBoundingClientRect();
     this.measure.update((m) =>
-      m ? { ...m, x2: this.snapX(e.clientX - r.left), y2: e.clientY - r.top } : m,
+      m
+        ? {
+            ...m,
+            x2: this.snapX(this.clamp(e.clientX - r.left, r.width)),
+            y2: this.clamp(e.clientY - r.top, r.height),
+          }
+        : m,
     );
   }
 
   onPointerUp(): void {
     if (!this.measuring) return;
     this.measuring = false;
+    this.releaseMeasurePointer();
     this.chart?.applyOptions({ handleScroll: true, handleScale: true });
     // Discard accidental zero-size measurements.
     const m = this.measure();
     if (m && Math.abs(m.x2 - m.x1) < 3 && Math.abs(m.y2 - m.y1) < 3) this.measure.set(null);
+    if (!this.pointerInside) this.interaction.clear(this.paneId());
+  }
+
+  private releaseMeasurePointer(): void {
+    const id = this.measurePointerId;
+    const el = this.measureCaptureEl;
+    this.measurePointerId = null;
+    this.measureCaptureEl = null;
+    if (id === null || !el) return;
+    if (el.hasPointerCapture?.(id)) el.releasePointerCapture(id);
   }
 
   onDblClick(): void {
@@ -1418,6 +1469,7 @@ export class ChartViewComponent implements OnDestroy {
   onEscape(): void {
     if (this.measure()) {
       this.measuring = false;
+      this.releaseMeasurePointer();
       this.chart?.applyOptions({ handleScroll: true, handleScale: true });
       this.measure.set(null);
     }

@@ -719,6 +719,9 @@ const LAYOUTS: { id: ChartLayout; label: string; icon: string }[] = [
         flex: 1;
         min-width: 0;
         position: relative;
+        /* Belt-and-braces with .chart-host's own clip: a pane never lets its
+           chart's overlays bleed into the neighbouring pane. */
+        overflow: hidden;
         border-right: 1px solid var(--ts-border);
       }
       .pane:last-child {

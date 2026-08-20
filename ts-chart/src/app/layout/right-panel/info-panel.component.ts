@@ -192,10 +192,6 @@ interface SeriesCard {
         white-space: nowrap;
         font-variant-numeric: tabular-nums;
       }
-      .chg lucide-icon {
-        display: inline-flex;
-        flex: none;
-      }
       .kv {
         display: grid;
         grid-template-columns: auto 1fr;
