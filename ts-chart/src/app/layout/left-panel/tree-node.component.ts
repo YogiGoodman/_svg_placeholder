@@ -12,6 +12,7 @@ import { SelectionService } from '../../core/selection.service';
 import { SeriesColorService } from '../../core/series-color.service';
 import { TreeStateService } from '../../core/tree-state.service';
 import { TooltipDirective } from '../../core/tooltip.directive';
+import { SeriesGlyphComponent } from '../../core/series-glyph.component';
 import { TREE_ROW_STYLES } from './tree-row.styles';
 
 /** Recursive tree row. Parents expand/collapse; leaves select a series. */
@@ -19,7 +20,7 @@ import { TREE_ROW_STYLES } from './tree-row.styles';
   selector: 'app-tree-node',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [LucideAngularModule, TooltipDirective],
+  imports: [LucideAngularModule, TooltipDirective, SeriesGlyphComponent],
   template: `
     @if (isLeaf()) {
       <button
@@ -31,7 +32,7 @@ import { TREE_ROW_STYLES } from './tree-row.styles';
         [attr.aria-current]="selected()"
         [tsTooltip]="leafTip()"
       >
-        <span class="dot" [style.background]="dotColor()"></span>
+        <ts-glyph class="dot" [glyph]="dotGlyph()" [color]="dotColor()" [size]="7" />
         <span class="label ts-truncate">{{ node().label }}</span>
         @if (node().badge) {
           <lucide-icon
@@ -65,7 +66,7 @@ import { TREE_ROW_STYLES } from './tree-row.styles';
           (click)="onTwistClick($event)"
         />
         @if (hasOwnSeries()) {
-          <span class="dot" [style.background]="dotColor()"></span>
+          <ts-glyph class="dot" [glyph]="dotGlyph()" [color]="dotColor()" [size]="7" />
         } @else if (node().icon) {
           <lucide-icon class="folder-ico" [name]="node().icon!" [size]="15" />
         }
@@ -144,6 +145,13 @@ export class TreeNodeComponent {
   readonly dotColor = computed(() => {
     const id = this.node().seriesId;
     return id && this.selected() ? this.colors.color(id) : 'transparent';
+  });
+
+  /** Identity mark for the assigned slot — same shape as the legend and the
+   *  line's own markers, so a CVD user can match row to line by shape. */
+  readonly dotGlyph = computed(() => {
+    const id = this.node().seriesId;
+    return id && this.selected() ? this.colors.glyph(id) : 'circle';
   });
 
   /** Full name for the themed tooltip; note the reason when a leaf is disabled. */

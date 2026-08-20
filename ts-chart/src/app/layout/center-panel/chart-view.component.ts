@@ -17,6 +17,10 @@ import {
   AreaSeries,
   CandlestickSeries,
   ColorType,
+  createSeriesMarkers,
+  ISeriesMarkersPluginApi,
+  SeriesMarker,
+  SeriesMarkerShape,
   CrosshairMode,
   createChart,
   IChartApi,
@@ -45,6 +49,9 @@ import { modeSupported } from '../../core/modes';
 import { ThemeService } from '../../core/theme.service';
 import { CustomRange, SelectionService } from '../../core/selection.service';
 import { ChartInteractionService } from '../../core/chart-interaction.service';
+import { SeriesColorService } from '../../core/series-color.service';
+import { SeriesGlyphComponent } from '../../core/series-glyph.component';
+import { GlyphId, readableOn } from '../../core/series-palettes';
 import { LayoutService } from '../../core/layout.service';
 import { TooltipDirective } from '../../core/tooltip.directive';
 import { formatPct, formatSigned, formatValue } from '../../core/format';
@@ -57,6 +64,8 @@ interface LegendRow {
   label: string;
   unit: string;
   color: string;
+  /** Non-color identity mark for this series' slot. */
+  glyph: GlyphId;
   value: number | null;
   delta: number | null;
   deltaPct: number | null;
@@ -70,6 +79,10 @@ interface ValueTag {
   y: number;
   value: number;
   color: string;
+  /** Readable foreground for text sitting ON `color`. */
+  on: string;
+  /** Non-color identity mark, matching the line's markers. */
+  glyph: GlyphId;
   /** Series symbol — the authoritative identifier at high series counts. */
   label: string;
 }
@@ -109,7 +122,28 @@ interface ActiveSeries {
   /** Lazy time -> value index for crosshair sync (invalidated with dataRef). */
   timeMap?: Map<string, number>;
   timeMapRef?: readonly unknown[];
+  /** Markers plugin handle, created lazily the first time markers are drawn. */
+  markers?: ISeriesMarkersPluginApi<Time>;
 }
+
+/**
+ * lightweight-charts v5 ships exactly four marker shapes
+ * (`SeriesMarkerShape = 'circle' | 'square' | 'arrowUp' | 'arrowDown'`), so the
+ * canvas can express three glyph cycles plus one in reserve. The DOM chrome is
+ * SVG and carries the full six-glyph vocabulary; these three are the ones that
+ * have to survive being drawn on a canvas at 8px.
+ */
+const GLYPH_TO_MARKER: Partial<Record<GlyphId, SeriesMarkerShape>> = {
+  circle: 'circle',
+  square: 'square',
+  triangle: 'arrowUp',
+  diamond: 'arrowDown',
+};
+
+/** Marks placed evenly across the visible range, never one per bar. */
+const MARKERS_PER_SERIES = 6;
+/** Past this many drawn series, markers stop helping and start crowding. */
+const MARKER_SERIES_CAP = 12;
 
 const SERIES_DEF: Record<SeriesType, SeriesDefinition<SeriesType>> = {
   Line: LineSeries as SeriesDefinition<SeriesType>,
@@ -121,7 +155,7 @@ const SERIES_DEF: Record<SeriesType, SeriesDefinition<SeriesType>> = {
   selector: 'app-chart-view',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [LucideAngularModule, TooltipDirective],
+  imports: [LucideAngularModule, TooltipDirective, SeriesGlyphComponent],
   template: `
     <div
       class="chart-host"
@@ -142,7 +176,7 @@ const SERIES_DEF: Record<SeriesType, SeriesDefinition<SeriesType>> = {
         <div class="legend__rows">
           @for (row of visibleRows(); track row.id) {
             <div class="lrow" [class.is-hidden]="row.hidden || row.unsupported || !!row.broken">
-              <span class="lrow__dot" [style.background]="row.color"></span>
+              <ts-glyph class="lrow__dot" [glyph]="row.glyph" [color]="row.color" [size]="8" />
               <button
                 class="lrow__label ts-truncate"
                 (click)="openInspector()"
@@ -224,7 +258,13 @@ const SERIES_DEF: Record<SeriesType, SeriesDefinition<SeriesType>> = {
            authoritative way to tell many lines apart; solid lines don't scale
            on hue alone past the palette core. -->
       @for (tag of valueTags(); track $index) {
-        <div class="lastval ts-mono" [style.top.px]="tag.y" [style.background]="tag.color">
+        <div
+          class="lastval ts-mono"
+          [style.top.px]="tag.y"
+          [style.background]="tag.color"
+          [style.color]="tag.on"
+        >
+          <ts-glyph [glyph]="tag.glyph" [color]="tag.on" [size]="7" />
           <span class="lastval__sym">{{ tag.label }}</span>
           <span class="lastval__val">{{ fmt(tag.value) }}</span>
         </div>
@@ -264,7 +304,7 @@ const SERIES_DEF: Record<SeriesType, SeriesDefinition<SeriesType>> = {
             <div class="hcard__date ts-mono">{{ hd }}</div>
             @for (row of cardRows(); track row.id) {
               <div class="hcard__row">
-                <span class="hcard__dot" [style.background]="row.color"></span>
+                <ts-glyph class="hcard__dot" [glyph]="row.glyph" [color]="row.color" [size]="8" />
                 <span class="hcard__sym ts-mono">{{ row.label }}</span>
                 <span class="hcard__val ts-mono">{{ fmt(row.value) }}</span>
                 <span class="hcard__unit">{{ row.unit }}</span>
@@ -537,18 +577,21 @@ const SERIES_DEF: Record<SeriesType, SeriesDefinition<SeriesType>> = {
       .lrow__btn.danger:hover {
         color: var(--ts-down);
       }
+      /* The authoritative identifier at high series counts: glyph + symbol +
+         value, filled with the series color. The foreground is computed per
+         chip from the fill's luminance, so a pale slot (high-contrast white,
+         Okabe-Ito yellow) gets dark text instead of unreadable white-on-white. */
       .lastval {
         position: absolute;
         right: 2px;
         z-index: 5;
         display: inline-flex;
-        align-items: baseline;
+        align-items: center;
         gap: var(--ts-space-1);
         max-width: 40%;
         transform: translateY(-50%);
         padding: 1px var(--ts-space-2);
         border-radius: var(--ts-radius-xs);
-        color: var(--ts-accent-contrast);
         font-size: var(--ts-fs-xxs);
         font-weight: var(--ts-fw-bold);
         box-shadow: var(--ts-shadow-1);
@@ -635,6 +678,7 @@ export class ChartViewComponent implements OnDestroy {
   private readonly host = viewChild.required<ElementRef<HTMLDivElement>>('host');
   private readonly theme = inject(ThemeService);
   readonly sel = inject(SelectionService);
+  private readonly colors = inject(SeriesColorService);
   private readonly interaction = inject(ChartInteractionService);
   private readonly layoutSvc = inject(LayoutService);
 
@@ -768,6 +812,7 @@ export class ChartViewComponent implements OnDestroy {
         label: s.symbol,
         unit: s.unit,
         color: s.color,
+        glyph: this.colors.glyph(s.id),
         value,
         delta,
         deltaPct: delta != null && prev ? (delta / prev) * 100 : null,
@@ -784,6 +829,14 @@ export class ChartViewComponent implements OnDestroy {
       this.render();
       this.ro = new ResizeObserver(() => this.updateOverlays());
       this.ro.observe(this.host().nativeElement);
+    });
+
+    // Palette or marker-mode change: identity marks are re-derived without a
+    // full data re-render, since only the mapping changed, not the series.
+    effect(() => {
+      this.colors.markersOn();
+      this.colors.glyphMap();
+      if (this.chart) this.updateMarkers();
     });
 
     // Re-render when inputs (series list, interval, mode, as-of) or hidden set change.
@@ -1433,9 +1486,68 @@ export class ChartViewComponent implements OnDestroy {
     }
   }
 
+  /**
+   * Draw the non-color identity marks on the lines themselves.
+   *
+   * Sparse by design: 6 marks spread across the visible range plus one pinned
+   * at the last bar, recomputed as the range changes. One mark per bar is the
+   * scientific-plotting convention and it turns a 730-point daily series into a
+   * mat of dots — the accessibility guidance for dense data is explicitly
+   * "evenly-spaced intervals or points of interest", not every point.
+   *
+   * Skipped entirely above `MARKER_SERIES_CAP` drawn series, where the marks
+   * stop disambiguating and the right-edge symbol label is doing the work.
+   */
+  private updateMarkers(): void {
+    const on = this.colors.markersOn() && this.active.length <= MARKER_SERIES_CAP;
+    const range = this.chart?.timeScale().getVisibleLogicalRange();
+
+    for (const a of this.active) {
+      if (!on || a.kind === 'Candlestick') {
+        a.markers?.setMarkers([]);
+        continue;
+      }
+      const shape = GLYPH_TO_MARKER[this.colors.glyph(a.legendId)];
+      const data = a.dataRef as readonly { time: Time }[];
+      if (!shape || !data.length) {
+        a.markers?.setMarkers([]);
+        continue;
+      }
+
+      // Confine the marks to what is on screen, so zooming in redistributes
+      // them instead of leaving the viewport bare.
+      const lo = Math.max(0, Math.ceil(range?.from ?? 0));
+      const hi = Math.min(data.length - 1, Math.floor(range?.to ?? data.length - 1));
+      const span = hi - lo;
+      const idx = new Set<number>();
+      if (span > 0) {
+        const step = span / (MARKERS_PER_SERIES - 1);
+        for (let i = 0; i < MARKERS_PER_SERIES; i++) idx.add(Math.round(lo + i * step));
+      }
+      idx.add(data.length - 1); // always mark the last bar, pairing with the value tag
+
+      const marks: SeriesMarker<Time>[] = [...idx]
+        .filter((i) => i >= 0 && i < data.length)
+        .sort((x, y) => x - y)
+        .map((i) => ({
+          time: data[i].time,
+          position: 'inBar' as const,
+          shape,
+          color: a.color,
+          size: 1,
+        }));
+
+      a.markers ??= createSeriesMarkers(a.api, []);
+      a.markers.setMarkers(marks);
+    }
+  }
+
   private updateOverlays(): void {
     const chart = this.chart;
     if (!chart) return;
+    // Markers ride the same triggers as the other overlays: resize, visible
+    // range change, and post-render. rAF-coalesced by the callers.
+    this.updateMarkers();
     const mode = this.mode();
     if (mode === 'seasonal' || mode === 'forward' || mode === 'strip') {
       this.markerX.set(null);
@@ -1453,6 +1565,8 @@ export class ChartViewComponent implements OnDestroy {
           y: Math.round(y),
           value: a.last,
           color: a.color,
+          on: readableOn(a.color),
+          glyph: this.colors.glyph(a.legendId),
           label: symOf.get(a.legendId) ?? '',
         });
       }

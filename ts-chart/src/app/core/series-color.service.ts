@@ -1,60 +1,45 @@
-import { computed, inject, Injectable, signal } from '@angular/core';
+import { computed, effect, inject, Injectable, signal } from '@angular/core';
 import { Theme, ThemeService } from './theme.service';
+import {
+  GlyphId,
+  PaletteEntry,
+  PaletteId,
+  PaletteVariant,
+  SERIES_PALETTES,
+  readableOn,
+} from './series-palettes';
 
-/** Dual-theme palette entry. 6-digit hex only (chart hexA() requires it). */
-interface PaletteEntry {
-  dark: string;
-  light: string;
-}
+export type { PaletteEntry, PaletteId, GlyphId } from './series-palettes';
+export { SERIES_PALETTES, PALETTE_LIST } from './series-palettes';
 
-/**
- * Ordered slot palette, OKLCh-normalized: every entry sits at the same
- * perceptual lightness/chroma (dark L≈0.76, light L≈0.55, C≈0.125), hue
- * rotated for max separation — no series shouts, none recedes, none is
- * confusable with chrome grays. Slot 0 is blue (accent kinship).
- *
- * Slots 0–11 are the maximally-separated core (typical desk use). Slots 12–23
- * fill the hue wheel at finer intervals for high-N comparison (up to ~24
- * distinct series). Past the core, hue alone no longer guarantees telling two
- * lines apart — the authoritative identifier is the right-edge colored
- * name/value label (see chart-view value tags). Lines stay SOLID always; dash
- * styles are reserved for semantic meaning (forecast/vintage), never identity.
- */
-export const SERIES_PALETTE: PaletteEntry[] = [
-  { dark: '#67b9fb', light: '#1f77b5' }, // blue
-  { dark: '#dfa54d', light: '#9b6500' }, // amber
-  { dark: '#73c786', light: '#2e8548' }, // green
-  { dark: '#bd9ef5', light: '#7d5eaf' }, // purple
-  { dark: '#f69088', light: '#af504b' }, // red
-  { dark: '#26cac3', light: '#008782' }, // teal
-  { dark: '#de93d7', light: '#995494' }, // pink
-  { dark: '#ee9b5f', light: '#a85a19' }, // orange
-  { dark: '#27c6dd', light: '#008499' }, // cyan
-  { dark: '#a7bd5d', light: '#697b10' }, // lime
-  { dark: '#cab049', light: '#896f00' }, // gold
-  { dark: '#9aaaff', light: '#5d69ba' }, // violet
-  { dark: '#4fc3e8', light: '#0d7ea3' }, // sky
-  { dark: '#e2b15a', light: '#8a6410' }, // honey
-  { dark: '#8fd07a', light: '#4f8a2e' }, // fern
-  { dark: '#d29bec', light: '#8452a6' }, // orchid
-  { dark: '#f2857e', light: '#b24a45' }, // salmon
-  { dark: '#5bcfb0', light: '#0c8a70' }, // mint
-  { dark: '#eb90bd', light: '#a8507e' }, // rose
-  { dark: '#e6a955', light: '#9c6412' }, // caramel
-  { dark: '#6fb6e0', light: '#2f6f9a' }, // steel
-  { dark: '#c0c063', light: '#7a7a18' }, // olive
-  { dark: '#b7a3ee', light: '#6a58b0' }, // periwinkle
-  { dark: '#e58fa0', light: '#a85062' }, // dusk-rose
-];
+/** Back-compat: the default variant's entries, still exported under the old name. */
+export const SERIES_PALETTE: readonly PaletteEntry[] = SERIES_PALETTES.default.entries;
+
+const PALETTE_KEY = 'tschart.palette';
+const MARKERS_KEY = 'tschart.markers';
+
+/** How on-canvas markers are decided. `auto` follows the palette's own default. */
+export type MarkerMode = 'auto' | 'always' | 'never';
 
 const FALLBACK: Record<Theme, string> = { dark: '#67b9fb', light: '#1f77b5' };
 
 /**
- * Assigns chart colors to series *on selection* from a fixed slot palette:
+ * Assigns chart identity to series *on selection* from a fixed slot palette:
  * survivors keep their slot, newcomers take the lowest free one, slots are
- * released on deselect. Colors resolve per active theme, so a theme toggle
- * recolors every consumer reactively. Catalog metadata carries no color —
- * this is the single source of truth (scales past a hardcoded catalog).
+ * released on deselect. Catalog metadata carries no color — this is the single
+ * source of truth.
+ *
+ * A slot resolves to a color AND a glyph:
+ *
+ *     slot -> { color: entries[slot % entries.length],
+ *               glyph: glyphs[floor(slot / entries.length)] }
+ *
+ * That second channel is not decoration. A red–green-safe palette tops out
+ * around 8 reliably distinguishable colors (Okabe–Ito is 8), while the app
+ * allows up to 12 series — so without shape, slots 9–12 would silently repeat a
+ * color and two lines would become indistinguishable with no indication. With
+ * it, an 8-color palette still yields 24 unambiguous slots, matching the
+ * default palette exactly.
  */
 @Injectable({ providedIn: 'root' })
 export class SeriesColorService {
@@ -63,10 +48,51 @@ export class SeriesColorService {
   /** id -> palette slot. Stable while selected. */
   private readonly slots = signal<ReadonlyMap<string, number>>(new Map());
 
+  /** Active palette variant. An accessibility preference, persisted on its own
+   *  key — it is a fact about the person, not about this screen, so it must
+   *  survive "Reset layout" and apply before any workspace restore paints. */
+  readonly palette = signal<PaletteId>(this.readPalette());
+  readonly markerMode = signal<MarkerMode>(this.readMarkers());
+
+  readonly variant = computed<PaletteVariant>(() => SERIES_PALETTES[this.palette()]);
+
+  /** Whether on-canvas markers should be drawn for the current settings. */
+  readonly markersOn = computed(() => {
+    const m = this.markerMode();
+    return m === 'always' ? true : m === 'never' ? false : this.variant().markersDefault;
+  });
+
+  constructor() {
+    effect(() => {
+      // Mirrors ThemeService: a root attribute lets CSS react to the palette
+      // (e.g. the heavier focus ring under high-contrast) without prop-drilling.
+      document.documentElement.setAttribute('data-palette', this.palette());
+      try {
+        localStorage.setItem(PALETTE_KEY, this.palette());
+      } catch {
+        /* ignore */
+      }
+    });
+    effect(() => {
+      try {
+        localStorage.setItem(MARKERS_KEY, this.markerMode());
+      } catch {
+        /* ignore */
+      }
+    });
+  }
+
+  setPalette(id: PaletteId): void {
+    this.palette.set(id);
+  }
+  setMarkerMode(m: MarkerMode): void {
+    this.markerMode.set(m);
+  }
+
   /**
-   * Reconcile slot assignments with the ordered selection. Called
-   * synchronously by SelectionService whenever the selection mutates
-   * (not via effect — that would flush late and flicker fallback colors).
+   * Reconcile slot assignments with the ordered selection. Called synchronously
+   * by SelectionService whenever the selection mutates (not via effect — that
+   * would flush late and flicker fallback colors).
    */
   sync(selectedIds: readonly string[]): void {
     this.slots.update((prev) => {
@@ -90,12 +116,23 @@ export class SeriesColorService {
     });
   }
 
-  /** id -> concrete hex for the active theme. */
+  /** id -> concrete hex for the active theme and palette. */
   readonly colorMap = computed<ReadonlyMap<string, string>>(() => {
     const t = this.theme.theme();
+    const entries = this.variant().entries;
     const m = new Map<string, string>();
     for (const [id, slot] of this.slots()) {
-      m.set(id, SERIES_PALETTE[slot % SERIES_PALETTE.length][t]);
+      m.set(id, entries[slot % entries.length][t]);
+    }
+    return m;
+  });
+
+  /** id -> glyph for the active palette. Mirrors `colorMap` exactly. */
+  readonly glyphMap = computed<ReadonlyMap<string, GlyphId>>(() => {
+    const { entries, glyphs } = this.variant();
+    const m = new Map<string, GlyphId>();
+    for (const [id, slot] of this.slots()) {
+      m.set(id, glyphs.length ? glyphs[Math.floor(slot / entries.length) % glyphs.length] : 'circle');
     }
     return m;
   });
@@ -103,5 +140,37 @@ export class SeriesColorService {
   /** Reactive lookup for templates/computeds (tracks colorMap + theme). */
   color(id: string): string {
     return this.colorMap().get(id) ?? FALLBACK[this.theme.theme()];
+  }
+
+  glyph(id: string): GlyphId {
+    return this.glyphMap().get(id) ?? 'circle';
+  }
+
+  /** Readable text color for a chip filled with this series' color. */
+  onColor(id: string): string {
+    return readableOn(this.color(id));
+  }
+
+  private readPalette(): PaletteId {
+    try {
+      const raw = localStorage.getItem(PALETTE_KEY) as PaletteId | null;
+      if (raw && raw in SERIES_PALETTES) return raw;
+      // Never chosen: honour the OS request for more contrast rather than
+      // making someone who already asked the system ask us again.
+      if (matchMedia('(prefers-contrast: more)').matches) return 'high-contrast';
+    } catch {
+      /* ignore */
+    }
+    return 'default';
+  }
+
+  private readMarkers(): MarkerMode {
+    try {
+      const raw = localStorage.getItem(MARKERS_KEY) as MarkerMode | null;
+      if (raw === 'auto' || raw === 'always' || raw === 'never') return raw;
+    } catch {
+      /* ignore */
+    }
+    return 'auto';
   }
 }

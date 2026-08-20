@@ -14,6 +14,8 @@ import {
 } from '@angular/cdk/drag-drop';
 import { LucideAngularModule } from 'lucide-angular';
 import { SelectionService } from '../../core/selection.service';
+import { SeriesColorService } from '../../core/series-color.service';
+import { SeriesGlyphComponent } from '../../core/series-glyph.component';
 import { ChartedSeries } from '../../data/models';
 import {
   computeStats,
@@ -42,6 +44,7 @@ interface SeriesCard {
     CdkDrag,
     CdkDragHandle,
     CdkDragPlaceholder,
+    SeriesGlyphComponent,
   ],
   template: `
     <section class="panel">
@@ -93,7 +96,12 @@ interface SeriesCard {
             </div>
             <div class="cardbody">
               <div class="cardbody__hero">
-                <span class="dot" [style.background]="c.meta.color"></span>
+                <ts-glyph
+                  class="dot"
+                  [glyph]="colors.glyph(c.meta.id)"
+                  [color]="c.meta.color"
+                  [size]="9"
+                />
                 <span class="nm ts-truncate">{{ c.meta.name }}</span>
               </div>
               <dl class="kv">
@@ -290,6 +298,8 @@ interface SeriesCard {
   ],
 })
 export class InfoPanelComponent {
+  readonly colors = inject(SeriesColorService);
+
   /** Cards are ordered by `selectedIds`, so a drop is a selection reorder —
    *  which is also what re-orders the legend and the chart's draw order. */
   onDrop(e: CdkDragDrop<unknown>): void {
