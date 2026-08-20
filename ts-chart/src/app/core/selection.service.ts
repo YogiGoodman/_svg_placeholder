@@ -218,6 +218,24 @@ export class SelectionService {
     this.compareIds.update((list) => list.filter((x) => x !== id));
   }
 
+  /**
+   * Move a selected series to a new position. Order is meaningful in three
+   * places at once: the inspector card list, the legend rows, and the chart's
+   * draw order (later = on top). Reordering deliberately does NOT recolor —
+   * `SeriesColorService.sync()` keys slots by id, so a series keeps its color
+   * for its whole lifetime on the chart no matter where it sits in the list.
+   */
+  reorder(from: number, to: number): void {
+    this.selectedIds.update((list) => {
+      if (from === to || from < 0 || to < 0 || from >= list.length || to >= list.length) return list;
+      const next = [...list];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
+    this.colors.sync(this.selectedIds());
+  }
+
   clear(): void {
     this.selectedIds.set([]);
     this.colors.sync([]);

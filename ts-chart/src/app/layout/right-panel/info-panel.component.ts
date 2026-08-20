@@ -5,6 +5,13 @@ import {
   inject,
   output,
 } from '@angular/core';
+import {
+  CdkDrag,
+  CdkDragDrop,
+  CdkDragHandle,
+  CdkDragPlaceholder,
+  CdkDropList,
+} from '@angular/cdk/drag-drop';
 import { LucideAngularModule } from 'lucide-angular';
 import { SelectionService } from '../../core/selection.service';
 import { ChartedSeries } from '../../data/models';
@@ -27,7 +34,15 @@ interface SeriesCard {
   selector: 'app-info-panel',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [LucideAngularModule, TooltipDirective, InfoCardComponent],
+  imports: [
+    LucideAngularModule,
+    TooltipDirective,
+    InfoCardComponent,
+    CdkDropList,
+    CdkDrag,
+    CdkDragHandle,
+    CdkDragPlaceholder,
+  ],
   template: `
     <section class="panel">
       <header class="phead">
@@ -46,8 +61,10 @@ interface SeriesCard {
         </button>
       </header>
 
-      <div class="scroll">
+      <div class="scroll" cdkDropList (cdkDropListDropped)="onDrop($event)">
         @for (c of cards(); track c.meta.id) {
+          <div class="drag" cdkDrag [cdkDragData]="c.meta.id">
+          <div class="drag__ph" *cdkDragPlaceholder></div>
           <app-info-card [title]="c.meta.symbol">
             <div card-actions class="hdr">
               <span
@@ -64,6 +81,14 @@ interface SeriesCard {
               </span>
               <button class="rm ts-icon-btn" (click)="sel.remove(c.meta.id)" tsTooltip="Remove series">
                 <lucide-icon name="trash-2" [size]="14" />
+              </button>
+              <button
+                class="grip ts-icon-btn"
+                cdkDragHandle
+                tsTooltip="Drag to reorder — also sets legend order and which line draws on top"
+                aria-label="Reorder series"
+              >
+                <lucide-icon name="grip-vertical" [size]="14" />
               </button>
             </div>
             <div class="cardbody">
@@ -82,6 +107,7 @@ interface SeriesCard {
               </dl>
             </div>
           </app-info-card>
+          </div>
         } @empty {
           <div class="ts-empty small">
             <img src="assets/placeholders/placeholder-quadrant.svg" alt="" />
@@ -143,6 +169,45 @@ interface SeriesCard {
         display: flex;
         flex-direction: column;
         gap: var(--ts-space-3);
+      }
+      /* The grip is the only affordance that is not always visible: a row of
+         permanent drag handles reads as clutter in a panel you mostly read. */
+      .grip {
+        width: 22px;
+        height: 22px;
+        cursor: grab;
+        opacity: 0;
+        transition: opacity var(--ts-dur-1) var(--ts-ease);
+      }
+      .drag:hover .grip,
+      .grip:focus-visible {
+        opacity: 1;
+      }
+      .grip:active {
+        cursor: grabbing;
+      }
+      .cdk-drag-preview {
+        border-radius: var(--ts-radius-md);
+        box-shadow: var(--ts-shadow-3);
+      }
+      .cdk-drag-placeholder {
+        opacity: 0;
+      }
+      .drag__ph {
+        height: 40px;
+        border: 1px dashed var(--ts-accent);
+        border-radius: var(--ts-radius-md);
+        background: var(--ts-accent-weak);
+      }
+      .cdk-drag-animating,
+      .scroll.cdk-drop-list-dragging .drag:not(.cdk-drag-placeholder) {
+        transition: transform var(--ts-dur-2) var(--ts-ease);
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .cdk-drag-animating,
+        .scroll.cdk-drop-list-dragging .drag:not(.cdk-drag-placeholder) {
+          transition: none;
+        }
       }
       .cardbody {
         display: flex;
@@ -225,6 +290,12 @@ interface SeriesCard {
   ],
 })
 export class InfoPanelComponent {
+  /** Cards are ordered by `selectedIds`, so a drop is a selection reorder —
+   *  which is also what re-orders the legend and the chart's draw order. */
+  onDrop(e: CdkDragDrop<unknown>): void {
+    this.sel.reorder(e.previousIndex, e.currentIndex);
+  }
+
   readonly sel = inject(SelectionService);
 
   /** Emitted when the dock's own close control is used (rail mirrors this). */

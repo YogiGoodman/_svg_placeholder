@@ -3,17 +3,11 @@ import { BreakpointObserver } from '@angular/cdk/layout';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { map } from 'rxjs';
 
-const SIZES_KEY = 'tschart.panelSizes';
 const DOCK_KEY = 'tschart.dock';
+const WIDTH_KEY = 'tschart.dockWidth';
 
 export type Viewport = 'large' | 'medium' | 'small';
 export type RightView = 'details' | 'dxTree';
-
-interface PanelSizes {
-  left: number;
-  center: number;
-  right: number;
-}
 
 interface DockState {
   /** Left dock (tree/search). Persisted; OPEN by default — the tree is a primary driver. */
@@ -24,11 +18,16 @@ interface DockState {
   rightView: RightView;
 }
 
-const DEFAULT_SIZES: PanelSizes = { left: 22, center: 56, right: 22 };
 const DEFAULT_DOCK: DockState = { leftCollapsed: false, rightCollapsed: true, rightView: 'details' };
 
+/** Left dock width in px. Bounds keep the tree usable at one end and the chart
+ *  dominant at the other — the chart always owns the majority of the shell. */
+const DEFAULT_WIDTH = 340;
+const MIN_WIDTH = 240;
+const MAX_WIDTH = 520;
+
 /**
- * Layout state: panel collapse, panel sizes (persisted), responsive viewport,
+ * Layout state: dock collapse, dock width (persisted), responsive viewport,
  * and chart data/chart toggle. All signal-based so the shell reacts instantly.
  */
 @Injectable({ providedIn: 'root' })
@@ -45,7 +44,8 @@ export class LayoutService {
   readonly leftCollapsed = signal(this.dock0.leftCollapsed);
   readonly rightCollapsed = signal(this.dock0.rightCollapsed);
   readonly rightView = signal<RightView>(this.dock0.rightView);
-  readonly sizes = signal<PanelSizes>(this.readSizes());
+  /** Draggable width of the left dock, persisted. */
+  readonly leftWidth = signal<number>(this.readWidth());
 
   /** Responsive viewport bucket derived from CDK BreakpointObserver. */
   readonly viewport = toSignal(
@@ -64,7 +64,11 @@ export class LayoutService {
 
   constructor() {
     effect(() => {
-      localStorage.setItem(SIZES_KEY, JSON.stringify(this.sizes()));
+      try {
+        localStorage.setItem(WIDTH_KEY, String(this.leftWidth()));
+      } catch {
+        /* ignore */
+      }
     });
     effect(() => {
       const dock: DockState = {
@@ -101,22 +105,26 @@ export class LayoutService {
     this.rightCollapsed.set(true);
   }
 
-  setSizes(next: PanelSizes): void {
-    this.sizes.set(next);
+  /** Clamped so a drag can never make the tree unusable or starve the chart. */
+  setLeftWidth(px: number): void {
+    this.leftWidth.set(Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, Math.round(px))));
   }
 
   resetSizes(): void {
-    this.sizes.set({ ...DEFAULT_SIZES });
+    this.leftWidth.set(DEFAULT_WIDTH);
   }
 
-  private readSizes(): PanelSizes {
+  private readWidth(): number {
     try {
-      const raw = localStorage.getItem(SIZES_KEY);
-      if (raw) return { ...DEFAULT_SIZES, ...JSON.parse(raw) };
+      // `tschart.panelSizes` drove a percentage split that no longer renders
+      // anything. Drop it on read so it does not sit in storage forever.
+      localStorage.removeItem('tschart.panelSizes');
+      const n = parseInt(localStorage.getItem(WIDTH_KEY) ?? '', 10);
+      if (Number.isFinite(n)) return Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, n));
     } catch {
       /* ignore */
     }
-    return { ...DEFAULT_SIZES };
+    return DEFAULT_WIDTH;
   }
 
   private readDock(): DockState {
