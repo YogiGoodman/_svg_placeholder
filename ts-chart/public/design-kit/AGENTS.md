@@ -7,6 +7,12 @@ feel, and charting conventions. Everything is token-driven — no hardcoded colo
 
 ## What's in here
 
+> **New in round 11:** `ACCESSIBILITY_GUIDE.md` (colour-vision-deficiency
+> palettes, the colour × shape identity model, contrast floors) and
+> `SEARCH_ARCHITECTURE.md` (the provider seam and the Elasticsearch migration).
+> Read the accessibility guide before touching `series-palettes.ts` — the CVD
+> palettes deliberately break the OKLCh lightness rule, and that is the point.
+
 ```
 design-kit/
   AGENTS.md              ← you are here (how to consume the kit)

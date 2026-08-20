@@ -267,3 +267,50 @@ reserved for price-axis values + identity labels and controls must not occlude t
 **Multi-field observations (target).** OHLC/bid-ask series show one field per series
 in compare; per-field chips only when a single/few series are focused. See
 `DESIGN_GUIDE.md` §7.4.
+
+---
+
+## 10 · Pane containment, markers and viewport control (round 11)
+
+### Clip every overlay to its pane
+
+`.chart-host` and `.pane` both set `overflow: hidden`. The measure rectangle,
+its label and the right-edge value tags are absolutely positioned against the
+host, and in a split layout the panes are flex siblings separated only by a
+border. A border is not a boundary: without the clip those overlays paint over
+the neighbouring chart and read as *that* chart's data.
+
+### Any drag takes pointer capture
+
+`setPointerCapture` on pointerdown, and `pointercancel` / `lostpointercapture`
+handled identically to `pointerup`. A shift-drag released over a sibling pane
+otherwise never delivers the origin's `pointerup`, so the origin stays at
+`handleScroll/handleScale: false` — pan and zoom dead until Escape. Wrap the
+call in try/catch: it throws `NotFoundError` for a pointer the browser no longer
+tracks, and that must not skip the cleanup that follows it.
+
+Leave the price-scale strip alone — that is lightweight-charts' own drag target
+(`axisPressedMouseMove`), so a measure must not start there.
+
+### Identity markers: sparse, never per bar
+
+```ts
+createSeriesMarkers(series, marks, { zOrder: 'aboveSeries' })
+```
+
+Six marks across the visible range plus one pinned at the last bar, recomputed
+on `subscribeVisibleLogicalRangeChange` behind a single rAF guard, and skipped
+entirely above 12 drawn series. One mark per bar turns a 730-point daily series
+into a mat of dots and makes the redraw O(n).
+
+**Four shapes exist** — `SeriesMarkerShape = 'circle' | 'square' | 'arrowUp' |
+'arrowDown'` (`typings.d.ts:4922`). That covers three glyph cycles with one
+spare. The DOM chrome is SVG and unconstrained.
+
+Lines stay `lineStyle: Solid`; dash remains semantic-only.
+
+### Viewport controls live on the card, not the pane
+
+`chart-panel` holds `viewChildren(ChartViewComponent)` and fans `zoomBy(±1)` /
+`fitAll()` to every pane, so split panes stay on one window. Two panes at
+different zooms do not merely look untidy — they invite a misread.

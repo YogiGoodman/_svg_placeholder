@@ -115,3 +115,23 @@ Named workspaces (N per user: `ws:{userId}:{slot}` + a list endpoint), shared
 read-only workspaces (tokenized link resolving server-side to a snapshot), and
 audit trail (append-only history table) all fit this schema without breaking
 `v: 1` clients — add fields behind the version gate.
+
+---
+
+## 5. Keys outside the workspace payload (round 11)
+
+Not everything belongs in `tschart.workspace`. These are stored separately and
+deliberately:
+
+| Key | Holds | Why it is not in the workspace |
+|---|---|---|
+| `tschart.palette` | Active series palette | An accessibility setting is a fact about the *person*, not this screen. Must survive "Reset layout" and apply before restore paints. |
+| `tschart.markers` | Line marker mode | Same. |
+| `tschart.dockWidth` | Browse dock width in px | Chrome geometry, not chart state. Replaces the vestigial `tschart.panelSizes`, which is now deleted on read. |
+| `tschart.theme`, `tschart.density` | Appearance | Pre-existing, same reasoning. |
+| `tschart.recent`, `tschart.legend`, `tschart.maxseries`, `tschart.treeChildLimit` | Pre-existing | — |
+
+**The payload version stays `v: 1`.** Round 11 added no field to the workspace
+snapshot, so no migration is needed. If one is ever added, `readWorkspace()`
+currently hard-rejects any `v !== 1` — that check must become a migration, or
+every existing user loses their screen on first load.

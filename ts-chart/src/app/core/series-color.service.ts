@@ -2,7 +2,6 @@ import { computed, effect, inject, Injectable, signal } from '@angular/core';
 import { Theme, ThemeService } from './theme.service';
 import {
   GlyphId,
-  PaletteEntry,
   PaletteId,
   PaletteVariant,
   SERIES_PALETTES,
@@ -11,9 +10,6 @@ import {
 
 export type { PaletteEntry, PaletteId, GlyphId } from './series-palettes';
 export { SERIES_PALETTES, PALETTE_LIST } from './series-palettes';
-
-/** Back-compat: the default variant's entries, still exported under the old name. */
-export const SERIES_PALETTE: readonly PaletteEntry[] = SERIES_PALETTES.default.entries;
 
 const PALETTE_KEY = 'tschart.palette';
 const MARKERS_KEY = 'tschart.markers';
