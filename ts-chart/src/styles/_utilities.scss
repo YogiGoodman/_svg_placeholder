@@ -187,6 +187,9 @@ lucide-icon svg {
   display: inline-flex;
   align-items: center;
   gap: var(--ts-space-1);
+  /* A segment label that wraps turns a one-line control into two bands and
+     shoves the whole toolbar taller. Segments truncate; they never wrap. */
+  white-space: nowrap;
   height: 24px;
   padding: 0 var(--ts-space-3);
   border-radius: var(--ts-radius-sm);

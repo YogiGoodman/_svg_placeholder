@@ -8,7 +8,8 @@ import {
   Star, Download, Columns3, RefreshCw, TrendingUp, TrendingDown, ChartArea,
   ChartCandlestick, ChartLine, Palette, LayoutGrid, CircleAlert, Layers,
   Square, Trash2, Minus, Plus, UnfoldHorizontal, CalendarRange, Copy, Crosshair,
-  ListTree,
+  ListTree, ZoomIn, ZoomOut, GripVertical, Accessibility, Contrast, LoaderCircle,
+  CornerDownLeft, Command, Filter,
 } from 'lucide-angular';
 
 export const APP_ICONS = {
@@ -19,5 +20,6 @@ export const APP_ICONS = {
   Star, Download, Columns3, RefreshCw, TrendingUp, TrendingDown, ChartArea,
   ChartCandlestick, ChartLine, Palette, LayoutGrid, CircleAlert, Layers,
   Square, Trash2, Minus, Plus, UnfoldHorizontal, CalendarRange, Copy, Crosshair,
-  ListTree,
+  ListTree, ZoomIn, ZoomOut, GripVertical, Accessibility, Contrast, LoaderCircle,
+  CornerDownLeft, Command, Filter,
 };

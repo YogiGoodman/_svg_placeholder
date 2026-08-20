@@ -6,6 +6,7 @@ import {
   inject,
   signal,
   viewChild,
+  viewChildren,
 } from '@angular/core';
 import { LucideAngularModule } from 'lucide-angular';
 import { SelectionService, ASOF_MIN } from '../../core/selection.service';
@@ -14,7 +15,6 @@ import { FullscreenService } from '../../core/fullscreen.service';
 import { ScreenshotService } from '../../core/screenshot.service';
 import {
   computeStats,
-  DATA_MIN,
   generateLine,
   generateOhlc,
   IntervalKey,
@@ -79,8 +79,25 @@ const LAYOUTS: { id: ChartLayout; label: string; icon: string }[] = [
             <div class="sep"></div>
           }
 
-          <!-- Mode: compact dropdown — scales past 5 modes, labels never wrap -->
-          <div class="dd">
+          <!-- Mode. Two renderings of ONE control: segmented when the card is wide
+               enough to show every label, a dropdown when it is not. A container
+               query (not a media query) picks, because the deciding width is the
+               CARD's — which changes when the tree dock opens or the resizer moves,
+               neither of which the viewport knows about. -->
+          <div class="ts-segmented mode-seg" [class.dim]="!ready()">
+            @for (m of modes; track m.id) {
+              <button
+                [class.is-active]="sel.chartMode() === m.id"
+                [disabled]="!ready() || !allowed().includes(m.id)"
+                [tsTooltip]="modeTip(m.id)"
+                (click)="sel.setChartMode(m.id)"
+              >
+                {{ m.label }}
+              </button>
+            }
+          </div>
+
+          <div class="dd mode-dd">
             <button
               class="ts-btn dd__btn dd__btn--wide"
               [class.is-active]="modeOpen()"
@@ -88,8 +105,7 @@ const LAYOUTS: { id: ChartLayout; label: string; icon: string }[] = [
               (click)="
                 modeOpen.set(!modeOpen());
                 typeOpen.set(false);
-                compareOpen.set(false);
-                rangeOpen.set(false)
+                compareOpen.set(false)
               "
               tsTooltip="Chart mode — what data is shown"
             >
@@ -131,69 +147,7 @@ const LAYOUTS: { id: ChartLayout; label: string; icon: string }[] = [
             </label>
           }
 
-          <div class="sep"></div>
-
-          <!-- Interval (shared date range) -->
-          <div class="ts-segmented" [class.dim]="!ready() || !intervalApplies()">
-            @for (iv of intervals; track iv) {
-              <button
-                [class.is-active]="sel.interval() === iv && !sel.customRange()"
-                [disabled]="!ready() || !intervalApplies()"
-                (click)="sel.setInterval(iv)"
-              >
-                {{ iv }}
-              </button>
-            }
-          </div>
-
           <!-- Custom from–to window (as-of mode only) -->
-          @if (sel.chartMode() === 'asof') {
-          <div class="dd">
-            <button
-              class="ts-icon-btn dd__btn"
-              [class.is-active]="rangeOpen() || !!sel.customRange()"
-              [disabled]="!ready()"
-              (click)="rangeOpen.set(!rangeOpen()); typeOpen.set(false); compareOpen.set(false)"
-              tsTooltip="Custom date range"
-            >
-              <lucide-icon name="calendar-range" [size]="15" />
-            </button>
-            @if (rangeOpen()) {
-              <div class="dd__backdrop" (click)="rangeOpen.set(false)"></div>
-              <div class="dd__pop dd__pop--range">
-                <label class="range__field">
-                  <span>From</span>
-                  <input
-                    type="date"
-                    #rFrom
-                    [min]="dataMin"
-                    [max]="today"
-                    [value]="sel.customRange()?.from ?? ''"
-                  />
-                </label>
-                <label class="range__field">
-                  <span>To</span>
-                  <input
-                    type="date"
-                    #rTo
-                    [min]="dataMin"
-                    [max]="today"
-                    [value]="sel.customRange()?.to ?? today"
-                  />
-                </label>
-                <div class="range__row">
-                  <button class="ts-btn" (click)="applyRange(rFrom.value, rTo.value)">Apply</button>
-                  @if (sel.customRange()) {
-                    <button class="ts-btn" (click)="sel.clearCustomRange(); rangeOpen.set(false)">
-                      Clear
-                    </button>
-                  }
-                </div>
-              </div>
-            }
-          </div>
-          }
-
           <div class="bar__actions">
           <!-- Chart type (line / area / candles) -->
           <div class="dd">
@@ -307,9 +261,25 @@ const LAYOUTS: { id: ChartLayout; label: string; icon: string }[] = [
 
           <div class="sep"></div>
 
-          <button class="ts-icon-btn" [disabled]="!ready()" (click)="capture()" tsTooltip="Screenshot">
-            <lucide-icon name="camera" [size]="16" />
-          </button>
+          @if (sel.view() === 'data') {
+            <!-- CSV is the honest export for a table: html-to-image cannot scale
+                 to a million rows, so the camera is hidden here rather than
+                 offering a capture that silently truncates. -->
+            <button class="ts-icon-btn" (click)="table()?.downloadCsv()" tsTooltip="Download CSV">
+              <lucide-icon name="download" [size]="16" />
+            </button>
+            <button
+              class="ts-icon-btn"
+              (click)="table()?.copyTable()"
+              [tsTooltip]="table()?.copied() ? 'Copied' : 'Copy for Excel'"
+            >
+              <lucide-icon [name]="table()?.copied() ? 'check' : 'copy'" [size]="16" />
+            </button>
+          } @else {
+            <button class="ts-icon-btn" [disabled]="!ready()" (click)="capture()" tsTooltip="Screenshot">
+              <lucide-icon name="camera" [size]="16" />
+            </button>
+          }
           <button
             class="ts-icon-btn"
             [class.is-active]="fs.active()"
@@ -376,17 +346,51 @@ const LAYOUTS: { id: ChartLayout; label: string; icon: string }[] = [
         <div class="flash" [class.on]="flashOn()"></div>
       </div>
 
-      <!-- Status footer: provenance lives at the bottom, terminal-style -->
-      <footer class="cfoot ts-mono">
-        @if (primary(); as p) {
-          <!-- Full provenance of the primary series: which symbol, from where,
-               at what cadence — a lone source string carried no context. -->
-          <span class="cfoot__src ts-truncate">{{ p.symbol }} · {{ p.source }} · {{ p.frequency }}</span>
-          <span class="cfoot__dot">·</span>
+      <!-- Chart foot: viewport controls left, time window right. Provenance moved
+           to the series inspector and the legend row tooltip — this band is worth
+           more as the place you reach for zoom and range than as a static caption. -->
+      <footer class="cfoot">
+        <div class="ts-segmented" [class.dim]="!ready()">
+          <button [disabled]="!ready()" (click)="zoomAll(-1)" tsTooltip="Zoom out">
+            <lucide-icon name="zoom-out" [size]="13" />
+          </button>
+          <button [disabled]="!ready()" (click)="zoomAll(1)" tsTooltip="Zoom in">
+            <lucide-icon name="zoom-in" [size]="13" />
+          </button>
+          <button [disabled]="!ready()" (click)="fitAll()" tsTooltip="Fit all data">
+            <lucide-icon name="unfold-horizontal" [size]="13" />
+          </button>
+        </div>
+
+        <span class="cfoot__spacer"></span>
+
+        <!-- A custom window can arrive from a deep link or a restored workspace.
+             Surfacing it here is what keeps it clearable: it used to be settable
+             only in as-of mode while applying in EVERY mode, so switching mode
+             stranded a window with no control left to clear it. -->
+        @if (sel.customRange(); as cr) {
+          <button
+            class="cfoot__chip ts-mono"
+            (click)="sel.clearCustomRange()"
+            tsTooltip="Clear the custom window and return to the interval buttons"
+          >
+            {{ fmtD(cr.from) }} – {{ fmtD(cr.to) }}
+            <lucide-icon name="x" [size]="12" />
+          </button>
         }
-        <span>as of {{ fmtD(today) }}</span>
-        <span class="cfoot__dot">·</span>
-        <span>demo data</span>
+
+        <div class="ts-segmented" [class.dim]="!ready() || !intervalApplies()">
+          @for (iv of intervals; track iv) {
+            <button
+              [class.is-active]="sel.interval() === iv && !sel.customRange()"
+              [disabled]="!ready() || !intervalApplies()"
+              [tsTooltip]="intervalTip()"
+              (click)="sel.setInterval(iv)"
+            >
+              {{ iv }}
+            </button>
+          }
+        </div>
       </footer>
     </section>
   `,
@@ -407,6 +411,24 @@ const LAYOUTS: { id: ChartLayout; label: string; icon: string }[] = [
         border: 1px solid var(--ts-border);
         border-radius: var(--ts-radius-lg);
         overflow: hidden;
+        /* The mode control switches on the CARD's width, not the viewport's —
+           opening the tree dock or dragging the resizer changes this box while
+           the viewport is unchanged. */
+        container-type: inline-size;
+        container-name: card;
+      }
+      /* Mode renders segmented only when there is room for every label; the
+         dropdown is the default so a narrow card can never wrap the bar. */
+      .mode-seg {
+        display: none;
+      }
+      @container card (min-width: 1040px) {
+        .mode-seg {
+          display: inline-flex;
+        }
+        .mode-dd {
+          display: none;
+        }
       }
       .card.is-fs {
         border-radius: 0;
@@ -617,25 +639,41 @@ const LAYOUTS: { id: ChartLayout; label: string; icon: string }[] = [
         left: 0;
         right: auto;
       }
-      /* Status footer: provenance at the bottom, terminal-style. */
+      /* Chart foot: viewport controls left, time window right. */
       .cfoot {
         display: flex;
         align-items: center;
         gap: var(--ts-space-2);
-        height: 22px;
-        padding: 0 var(--ts-space-3);
+        padding: var(--ts-space-1) var(--ts-space-2);
         border-top: 1px solid var(--ts-border);
-        font-size: var(--ts-fs-xxs);
-        color: var(--ts-text-muted);
         flex: none;
+        flex-wrap: nowrap;
         white-space: nowrap;
         overflow: hidden;
       }
-      .cfoot__src {
+      .cfoot .ts-segmented {
+        flex: none;
+      }
+      .cfoot__spacer {
+        flex: 1;
         min-width: 0;
       }
-      .cfoot__dot {
-        color: var(--ts-text-faint);
+      .cfoot__chip {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--ts-space-1);
+        flex: none;
+        height: 24px;
+        padding: 0 var(--ts-space-2);
+        border-radius: var(--ts-radius-sm);
+        border: 1px solid var(--ts-accent);
+        background: var(--ts-accent-weak);
+        color: var(--ts-accent-strong);
+        font-size: var(--ts-fs-xxs);
+        cursor: pointer;
+      }
+      .cfoot__chip:hover {
+        background: var(--ts-bg-active);
       }
       .asof:focus-within {
         border-color: var(--ts-accent);
@@ -784,6 +822,12 @@ export class ChartPanelComponent {
   private readonly interaction = inject(ChartInteractionService);
 
   private readonly card = viewChild.required<ElementRef<HTMLElement>>('card');
+  /** Every mounted pane. Split panes zoom together — comparing two windows that
+   *  drifted apart is worse than useless, it is misleading. */
+  private readonly views = viewChildren(ChartViewComponent);
+  /** The data table owns the CSV logic (it holds the rows); the card owns the
+   *  action bar. Reaching in beats duplicating the row-building. */
+  readonly table = viewChild(DataTableComponent);
 
   readonly intervals = INTERVALS;
   readonly modes = MODE_META;
@@ -794,9 +838,7 @@ export class ChartPanelComponent {
   readonly loading = signal(false);
   readonly compareOpen = signal(false);
   readonly typeOpen = signal(false);
-  readonly rangeOpen = signal(false);
   readonly modeOpen = signal(false);
-  readonly dataMin = DATA_MIN;
 
   readonly primary = this.sel.primary;
   readonly allowed = this.sel.allowedModes;
@@ -862,6 +904,22 @@ export class ChartPanelComponent {
     const m = this.sel.chartMode();
     return m === 'latest' || m === 'asof';
   });
+  /** Every disabled control explains itself — including this one. */
+  readonly intervalTip = computed(() =>
+    !this.ready()
+      ? 'Select a series first'
+      : !this.intervalApplies()
+        ? `Interval does not apply in ${MODE_LABEL[this.sel.chartMode()]} mode`
+        : 'Charted time window',
+  );
+
+  /** Fan a viewport command out to every pane. */
+  zoomAll(dir: 1 | -1): void {
+    for (const v of this.views()) v.zoomBy(dir);
+  }
+  fitAll(): void {
+    for (const v of this.views()) v.fitAll();
+  }
 
   /**
    * Full-panel error ONLY when every selected series is broken — a single
@@ -914,12 +972,6 @@ export class ChartPanelComponent {
 
   onAsOf(e: Event): void {
     this.sel.setAsOf((e.target as HTMLInputElement).value);
-  }
-
-  applyRange(from: string, to: string): void {
-    if (!from || !to) return;
-    this.sel.setCustomRange(from, to);
-    this.rangeOpen.set(false);
   }
 
   toggleFs(): void {

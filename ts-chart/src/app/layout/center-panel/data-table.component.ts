@@ -3,7 +3,6 @@ import { ScrollingModule } from '@angular/cdk/scrolling';
 import { LucideAngularModule } from 'lucide-angular';
 import { ChartedSeries, ChartMode, SeriesMeta } from '../../data/models';
 import {
-  computeStats,
   generateAsOf,
   generateForwardCurve,
   generateLine,
@@ -77,31 +76,6 @@ interface MatrixRow {
         </div>
       </cdk-virtual-scroll-viewport>
 
-      <div class="tfoot" [style.grid-template-columns]="gridCols()">
-        <span class="tfoot__lead">
-          {{ rows().length }} rows
-          <button class="ts-icon-btn xbtn" (click)="downloadCsv()" tsTooltip="Download CSV">
-            <lucide-icon name="download" [size]="13" />
-          </button>
-          <button
-            class="ts-icon-btn xbtn"
-            (click)="copyTable()"
-            [tsTooltip]="copied() ? 'Copied' : 'Copy for Excel'"
-          >
-            <lucide-icon [name]="copied() ? 'check' : 'copy'" [size]="13" />
-          </button>
-        </span>
-        @for (st of stats(); track $index) {
-          <span
-            class="num ts-mono"
-            [tsTooltip]="'min ' + fmt(st.min) + ' · max ' + fmt(st.max)"
-            >avg {{ fmt(st.avg) }}</span
-          >
-        }
-        @if (showDelta()) {
-          <span></span>
-        }
-      </div>
     </div>
   `,
   styles: [
@@ -114,8 +88,7 @@ interface MatrixRow {
         min-height: 0;
       }
       .thead,
-      .tr,
-      .tfoot {
+      .tr {
         display: grid;
         align-items: center;
         gap: var(--ts-space-2);
@@ -187,21 +160,6 @@ interface MatrixRow {
       .td.num {
         text-align: right;
       }
-      .tfoot {
-        padding: var(--ts-space-2) var(--ts-space-4);
-        border-top: 1px solid var(--ts-border);
-        font-size: var(--ts-fs-xxs);
-        color: var(--ts-text-muted);
-      }
-      .tfoot__lead {
-        display: inline-flex;
-        align-items: center;
-        gap: var(--ts-space-1);
-      }
-      .xbtn {
-        width: 22px;
-        height: 22px;
-      }
     `,
   ],
 })
@@ -249,10 +207,6 @@ export class DataTableComponent {
       delta: deltas ? (deltas.get(t) ?? null) : null,
     }));
   });
-
-  readonly stats = computed(() =>
-    this.points().map((pts) => computeStats(pts.length ? pts : [{ time: '', value: 0 }])),
-  );
 
   fmt = (v: number) => formatValue(v);
   signed = (v: number) => formatSigned(v);

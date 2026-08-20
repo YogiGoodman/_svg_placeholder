@@ -257,21 +257,6 @@ const SERIES_DEF: Record<SeriesType, SeriesDefinition<SeriesType>> = {
         }
       }
 
-      <!-- Zoom controls (reveal on chart hover) -->
-      @if (series().length > 0) {
-        <div class="zoom">
-          <button class="zoom__btn" (click)="zoomBy(-1)" tsTooltip="Zoom out">
-            <lucide-icon name="minus" [size]="14" />
-          </button>
-          <button class="zoom__btn" (click)="zoomBy(1)" tsTooltip="Zoom in">
-            <lucide-icon name="plus" [size]="14" />
-          </button>
-          <button class="zoom__btn" (click)="fitAll()" tsTooltip="Fit all data">
-            <lucide-icon name="unfold-horizontal" [size]="14" />
-          </button>
-        </div>
-      }
-
       <!-- Crosshair-following tooltip (toggleable, off by default) -->
       @if (sel.hoverCard() && cursorPt(); as pt) {
         @if (hoverDate(); as hd) {
@@ -630,33 +615,6 @@ const SERIES_DEF: Record<SeriesType, SeriesDefinition<SeriesType>> = {
       /* Bottom-LEFT, raised clear of the time axis: the right edge belongs to
          the price-axis values + per-series identity labels — controls must
          never occlude them (obs: fit button hid axis text). */
-      .zoom {
-        position: absolute;
-        left: var(--ts-space-2);
-        bottom: 30px;
-        z-index: 5;
-        display: inline-flex;
-        gap: 1px;
-        padding: 2px;
-        border-radius: var(--ts-radius-md);
-        background: color-mix(in srgb, var(--ts-bg-elevated) 84%, transparent);
-        border: 1px solid var(--ts-border-subtle);
-        backdrop-filter: blur(6px);
-      }
-      .zoom__btn {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 26px;
-        height: 24px;
-        border-radius: var(--ts-radius-sm);
-        color: var(--ts-text-muted);
-        cursor: pointer;
-      }
-      .zoom__btn:hover {
-        background: var(--ts-bg-active);
-        color: var(--ts-text-bright);
-      }
     `,
   ],
 })

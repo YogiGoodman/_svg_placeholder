@@ -79,7 +79,16 @@ import { DxBrowsePanelComponent } from '../right-panel/dx-tree/dx-browse-panel.c
               <app-info-panel (close)="layout.toggleRight()" />
             }
             @case ('dxTree') {
-              <app-dx-browse-panel (close)="layout.toggleRight()" />
+              <!-- DevExtreme is ~1.5MB of JS+CSS and this POC is the app's ONLY
+                   consumer of it. Deferring keeps it out of the eager bundle so
+                   the initial chunk stays honest for the traders who never open
+                   it. If DevExtreme is ever adopted outside this panel, revisit
+                   this and the Angular budgets together. -->
+              @defer (on immediate) {
+                <app-dx-browse-panel (close)="layout.toggleRight()" />
+              } @placeholder {
+                <div class="dock__loading"></div>
+              }
             }
           }
         </aside>
@@ -144,6 +153,10 @@ import { DxBrowsePanelComponent } from '../right-panel/dx-tree/dx-browse-panel.c
         min-height: 0;
         background: var(--ts-bg-elevated);
         overflow: hidden;
+      }
+      .dock__loading {
+        height: 100%;
+        background: var(--ts-bg-elevated);
       }
       .dock--left {
         border-right: 1px solid var(--ts-border);
