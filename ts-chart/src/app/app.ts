@@ -55,6 +55,16 @@ export class App {
   @HostListener('window:keydown', ['$event'])
   onKey(e: KeyboardEvent): void {
     const mod = e.metaKey || e.ctrlKey;
+    // Bare "/" focuses search, but only when the user is not already typing —
+    // stealing a slash mid-query would be worse than not having the shortcut.
+    const el = e.target as HTMLElement | null;
+    const typing =
+      el?.tagName === 'INPUT' || el?.tagName === 'TEXTAREA' || el?.isContentEditable === true;
+    if (!mod && e.key === '/' && !typing) {
+      e.preventDefault();
+      document.querySelector<HTMLInputElement>('app-toolbar-search input')?.focus();
+      return;
+    }
     if (mod && e.key.toLowerCase() === 'k') {
       e.preventDefault();
       this.palette.toggle();

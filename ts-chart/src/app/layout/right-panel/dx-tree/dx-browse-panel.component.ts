@@ -13,9 +13,9 @@ import {
   TAB_ICONS,
   TAB_LABELS,
   TREES,
-  searchSeries,
 } from '../../../data/series-catalog.data';
 import { SelectionService } from '../../../core/selection.service';
+import { SearchService } from '../../../search/search.service';
 import { SeriesColorService } from '../../../core/series-color.service';
 import { TooltipDirective } from '../../../core/tooltip.directive';
 import { BROWSE_CHROME_STYLES } from '../../left-panel/browse-chrome.styles';
@@ -72,14 +72,14 @@ const TAB_SHORT: Record<TabId, string> = {
           type="text"
           placeholder="Search series, symbol, tag…"
           [value]="query()"
-          (input)="query.set(box.value)"
+          (input)="onQuery(box.value)"
           spellcheck="false"
           autocomplete="off"
         />
         @if (query()) {
           <button
             class="ts-icon-btn search__clear"
-            (click)="query.set(''); box.value = ''"
+            (click)="onQuery(''); box.value = ''"
             tsTooltip="Clear search"
           >
             <lucide-icon name="x" [size]="14" />
@@ -93,7 +93,7 @@ const TAB_SHORT: Record<TabId, string> = {
           @if (results().length) {
             <div class="results">
               <span class="results__meta">
-                {{ results().length }} match{{ results().length === 1 ? '' : 'es' }}
+                {{ total() }} match{{ total() === 1 ? '' : 'es' }}
               </span>
               @for (s of results(); track s.id) {
                 <button
@@ -152,9 +152,18 @@ export class DxBrowsePanelComponent {
   readonly icons = TAB_ICONS;
   readonly totalCount = Object.keys(SERIES).length;
 
+  private readonly search = inject(SearchService);
+  private readonly session = this.search.createSession({ pageSize: 100 });
+
   readonly activeTab = signal<TabId>('forecast');
   readonly query = signal('');
 
   readonly roots = computed(() => TREES[this.activeTab()]);
-  readonly results = computed(() => searchSeries(this.query()));
+  readonly results = computed(() => this.session.hits());
+  readonly total = computed(() => this.session.total());
+
+  onQuery(v: string): void {
+    this.query.set(v);
+    this.session.setQuery(v);
+  }
 }

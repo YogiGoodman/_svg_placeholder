@@ -4,6 +4,7 @@ import { LucideAngularModule } from 'lucide-angular';
 import { ThemeService } from '../../core/theme.service';
 import { TooltipDirective } from '../../core/tooltip.directive';
 import { UserMenuComponent } from './user-menu.component';
+import { ToolbarSearchComponent } from './toolbar-search.component';
 
 export const APP_VERSION = '0.1.0';
 
@@ -11,7 +12,13 @@ export const APP_VERSION = '0.1.0';
   selector: 'app-toolbar',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [OverlayModule, LucideAngularModule, TooltipDirective, UserMenuComponent],
+  imports: [
+    OverlayModule,
+    LucideAngularModule,
+    TooltipDirective,
+    UserMenuComponent,
+    ToolbarSearchComponent,
+  ],
   template: `
     <header class="toolbar">
       <!-- Left cluster — panel toggles live on the rail, not here (no duplication) -->
@@ -37,7 +44,10 @@ export const APP_VERSION = '0.1.0';
         </div>
       </div>
 
-      <div class="spacer"></div>
+      <!-- Search lives in the toolbar because it is a primary action, not a
+           panel toggle and not a preference — the two things doctrine keeps out
+           of here. Every trading terminal keeps it permanently visible. -->
+      <app-toolbar-search />
 
       <!-- Right cluster -->
       <div class="cluster">
@@ -98,8 +108,10 @@ export const APP_VERSION = '0.1.0';
         align-items: center;
         gap: var(--ts-space-1);
       }
-      .spacer {
-        flex: 1;
+      app-toolbar-search {
+        flex: 1 1 auto;
+        min-width: 0;
+        margin: 0 var(--ts-space-4);
       }
       .brand {
         display: flex;

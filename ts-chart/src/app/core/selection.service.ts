@@ -137,26 +137,52 @@ export class SelectionService {
   }
 
   /** Toggle a series in/out of the selection (tree + search rows use this). */
-  toggle(id: string): void {
-    if (!SERIES[id]) return;
+  toggle(id: string): { evicted: string | null } {
+    if (!SERIES[id]) return { evicted: null };
     if (this.selectedIds().includes(id)) {
       this.remove(id);
-    } else {
-      this.add(id);
+      return { evicted: null };
     }
+    return this.add(id);
   }
 
-  add(id: string): void {
-    if (!SERIES[id]) return;
+  /** Symbol of the series that would be evicted next at the cap. */
+  readonly oldestSymbol = computed(() => {
+    const id = this.selectedIds()[0];
+    return id ? SERIES[id]?.symbol : undefined;
+  });
+
+  /**
+   * Add a series, reporting what it displaced.
+   *
+   * At the cap this silently `shift()`ed the oldest, and `colors.sync()` then
+   * handed the newcomer the freed slot — so a line vanished and the chart
+   * appeared to recolor with nothing on screen explaining why. The eviction is
+   * still the right behaviour (blocking mid-flow is worse), but callers can now
+   * say what happened and offer an undo. Existing callers that ignore the
+   * return value are unaffected.
+   */
+  add(id: string): { evicted: string | null } {
+    if (!SERIES[id]) return { evicted: null };
+    let evicted: string | null = null;
     this.selectedIds.update((list) => {
       if (list.includes(id)) return list;
       const next = [...list, id];
-      // Drop oldest when over the cap.
-      while (next.length > this.maxSeries()) next.shift();
+      while (next.length > this.maxSeries()) {
+        const dropped = next.shift();
+        if (dropped) evicted = dropped;
+      }
       return next;
     });
     this.colors.sync(this.selectedIds());
     this.pushRecent(id);
+    return { evicted };
+  }
+
+  /** Undo an eviction: put the dropped series back and remove what replaced it. */
+  restoreEvicted(evicted: string, added: string): void {
+    this.selectedIds.update((list) => [evicted, ...list.filter((x) => x !== added)]);
+    this.colors.sync(this.selectedIds());
   }
 
   /** Replace the whole selection with a single series (deep-link / single pick). */

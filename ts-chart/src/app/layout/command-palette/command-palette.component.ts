@@ -7,6 +7,7 @@ import {
   inject,
   Injectable,
   signal,
+  untracked,
   viewChild,
 } from '@angular/core';
 import { LucideAngularModule } from 'lucide-angular';
@@ -15,8 +16,10 @@ import { SeriesColorService } from '../../core/series-color.service';
 import { ThemeService } from '../../core/theme.service';
 import { LayoutService } from '../../core/layout.service';
 import { MODE_META } from '../../core/modes';
-import { searchSeries } from '../../data/series-catalog.data';
-import { SeriesMeta } from '../../data/models';
+import { SearchService } from '../../search/search.service';
+import { toHit } from '../../search/search.types';
+import { SERIES } from '../../data/series-catalog.data';
+import { SearchResultsComponent } from '../../search/search-results.component';
 
 /** Opens/closes the ⌘K palette (toggled from the global key handler). */
 @Injectable({ providedIn: 'root' })
@@ -47,19 +50,29 @@ interface Cmd {
   selector: 'app-command-palette',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [LucideAngularModule],
+  imports: [LucideAngularModule, SearchResultsComponent],
   template: `
     @if (svc.open()) {
-      <div class="scrim" (click)="svc.close()"></div>
-      <div class="panel" role="dialog" aria-modal="true" aria-label="Command palette">
+      <!-- No scrim. This is the surface a trader opens WHILE watching the tape;
+           a veil over live data failed desk review, and blur reads as a smudge.
+           Separation is elevation and shadow. Outside click closes it. -->
+      <div class="catcher" (click)="svc.close()"></div>
+      <div class="panel" role="dialog" aria-label="Command palette">
         <div class="inputrow">
           <lucide-icon name="search" [size]="16" />
           <input
             #box
             type="text"
+            role="combobox"
+            aria-autocomplete="list"
+            aria-haspopup="listbox"
+            aria-controls="ts-palette"
+            [attr.aria-expanded]="true"
+            [attr.aria-activedescendant]="activeId()"
+            aria-label="Search series and commands"
             placeholder="Type a ticker or command…"
             [value]="query()"
-            (input)="query.set(box.value); active.set(0)"
+            (input)="onInput(box.value)"
             (keydown)="onKey($event)"
             spellcheck="false"
             autocomplete="off"
@@ -68,36 +81,24 @@ interface Cmd {
         </div>
 
         <div class="list">
-          @if (seriesResults().length) {
+          @if (hits().length) {
             <div class="group">{{ query() ? 'Series' : 'Recent' }}</div>
-            @for (s of seriesResults(); track s.id; let i = $index) {
-              <button
-                class="row"
-                [class.is-active]="active() === i"
-                (mouseenter)="active.set(i)"
-                (click)="pick(i)"
-              >
-                <span
-                  class="dot"
-                  [style.background]="sel.isSelected(s.id) ? colors.color(s.id) : 'transparent'"
-                ></span>
-                <span class="sym ts-mono">{{ s.symbol }}</span>
-                <span class="name ts-truncate">{{ s.name }}</span>
-                <span class="path ts-truncate">{{ s.path.join(' › ') }}</span>
-                @if (sel.isSelected(s.id)) {
-                  <lucide-icon class="on" name="check" [size]="14" />
-                }
-              </button>
-            }
+            <ts-search-results
+              listboxId="ts-palette"
+              [hits]="hits()"
+              [active]="active()"
+              (hover)="active.set($event)"
+              (pick)="pick($event)"
+            />
           }
           @if (commandResults().length) {
             <div class="group">Commands</div>
             @for (c of commandResults(); track c.id; let i = $index) {
               <button
                 class="row"
-                [class.is-active]="active() === seriesResults().length + i"
-                (mouseenter)="active.set(seriesResults().length + i)"
-                (click)="pick(seriesResults().length + i)"
+                [class.is-active]="active() === hits().length + i"
+                (mouseenter)="active.set(hits().length + i)"
+                (click)="pick(hits().length + i)"
               >
                 <lucide-icon class="cmdic" [name]="c.icon" [size]="15" />
                 <span class="name">{{ c.label }}</span>
@@ -107,27 +108,37 @@ interface Cmd {
               </button>
             }
           }
-          @if (!seriesResults().length && !commandResults().length) {
+          @if (!hits().length && !commandResults().length) {
             <div class="empty">No matches for “{{ query() }}”</div>
           }
         </div>
 
+        @if (evicted(); as ev) {
+          <div class="evict" role="status">
+            <span>{{ ev.symbol }} dropped (cap {{ sel.maxSeries() }})</span>
+            <button class="evict__btn" (click)="undoEvict()">Undo</button>
+            <button class="evict__btn" (click)="raiseCap()">Raise cap</button>
+          </div>
+        }
+
         <div class="foot">
           <span><span class="kbd">↑↓</span> navigate</span>
-          <span><span class="kbd">↵</span> select</span>
-          <span><span class="kbd">esc</span> close</span>
+          <span><span class="kbd">↵</span> add</span>
+          <span><span class="kbd">⌘↵</span> only this</span>
+          <span class="foot__spacer"></span>
+          <span class="foot__count" role="status" aria-live="polite">{{ countLabel() }}</span>
         </div>
       </div>
     }
   `,
   styles: [
     `
-      .scrim {
+      /* Invisible click-catcher, not a veil: it closes the panel on an outside
+         click without putting anything between the trader and the chart. */
+      .catcher {
         position: fixed;
         inset: 0;
         z-index: 90;
-        background: color-mix(in srgb, var(--ts-bg) 55%, transparent);
-        backdrop-filter: blur(2px);
       }
       .panel {
         position: fixed;
@@ -187,37 +198,39 @@ interface Cmd {
         color: var(--ts-text-secondary);
         cursor: pointer;
         text-align: left;
+        box-shadow: inset 2px 0 0 transparent;
       }
       .row.is-active {
         background: var(--ts-bg-active);
         color: var(--ts-text-bright);
-      }
-      .dot {
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-        flex: none;
-      }
-      .sym {
-        font-size: var(--ts-fs-sm);
-        font-weight: var(--ts-fw-bold);
-        color: var(--ts-text-bright);
-        flex: none;
-        min-width: 64px;
+        box-shadow: inset 2px 0 0 var(--ts-accent-strong);
       }
       .name {
         font-size: var(--ts-fs-sm);
         min-width: 0;
         flex: 1;
       }
-      .path {
+      .evict {
+        display: flex;
+        align-items: center;
+        gap: var(--ts-space-2);
+        padding: var(--ts-space-2) var(--ts-space-4);
+        border-top: 1px solid var(--ts-border);
         font-size: var(--ts-fs-xxs);
-        color: var(--ts-text-muted);
-        max-width: 40%;
+        color: var(--ts-text-secondary);
       }
-      .on {
+      .evict__btn {
         color: var(--ts-accent-strong);
-        flex: none;
+        cursor: pointer;
+        font-size: var(--ts-fs-xxs);
+        font-weight: var(--ts-fw-semibold);
+      }
+      .foot__spacer {
+        flex: 1;
+      }
+      .foot__count {
+        color: var(--ts-text-muted);
+        font-variant-numeric: tabular-nums;
       }
       .cmdic {
         color: var(--ts-text-muted);
@@ -259,12 +272,35 @@ export class CommandPaletteComponent {
 
   private readonly box = viewChild<ElementRef<HTMLInputElement>>('box');
 
+  private readonly search = inject(SearchService);
+  /** This surface's own session — the toolbar has a separate one so the two
+   *  never overwrite each other's query, but both share provider and cache. */
+  private readonly session = this.search.createSession({
+    pageSize: 8,
+    boostIds: () => this.sel.recentIds(),
+  });
+
   readonly query = signal('');
   readonly active = signal(0);
+  /** Reported so the user can undo an eviction they did not ask for. */
+  readonly evicted = signal<{ id: string; symbol: string; added: string } | null>(null);
 
-  readonly seriesResults = computed<SeriesMeta[]>(() => {
-    const q = this.query().trim();
-    return q ? searchSeries(q).slice(0, 8) : this.sel.recent().slice(0, 6);
+  /** Empty query shows recents; otherwise ranked provider hits. */
+  readonly hits = computed(() =>
+    this.query().trim()
+      ? this.session.hits().slice(0, 8)
+      : this.sel.recent().slice(0, 6).map((m) => toHit(m)),
+  );
+
+  readonly activeId = computed(() =>
+    this.active() < this.hits().length ? `ts-palette-opt-${this.active()}` : null,
+  );
+
+  readonly countLabel = computed(() => {
+    if (!this.query().trim()) return '';
+    const total = this.session.total();
+    const shown = this.hits().length;
+    return total ? `${shown} of ${total} · ${this.session.took()} ms` : 'no matches';
   });
 
   private readonly commands = computed<Cmd[]>(() => {
@@ -342,18 +378,48 @@ export class CommandPaletteComponent {
   });
 
   constructor() {
-    // Focus the input every time the palette opens; reset state on close.
+    // Focus the input every time the palette opens, and reset state.
+    //
+    // The body MUST be untracked. `session.setQuery()` reads the session's own
+    // signals on the way through, which would register them as dependencies of
+    // this effect — and since the effect also writes them, every keystroke
+    // re-ran it and reset `query` straight back to empty. The only dependency
+    // this effect should have is `svc.open()`.
     effect(() => {
-      if (this.svc.open()) {
+      const open = this.svc.open();
+      untracked(() => {
+        if (!open) return;
         this.query.set('');
+        this.session.setQuery('');
         this.active.set(0);
+        this.evicted.set(null);
         queueMicrotask(() => this.box()?.nativeElement.focus());
-      }
+      });
     });
   }
 
+  onInput(v: string): void {
+    this.query.set(v);
+    this.session.setQuery(v);
+    this.active.set(0);
+  }
+
+  undoEvict(): void {
+    const ev = this.evicted();
+    if (!ev) return;
+    this.sel.restoreEvicted(ev.id, ev.added);
+    this.evicted.set(null);
+  }
+
+  raiseCap(): void {
+    this.sel.setMax(this.sel.maxSeries() + 2);
+    const ev = this.evicted();
+    if (ev) this.sel.add(ev.id);
+    this.evicted.set(null);
+  }
+
   onKey(e: KeyboardEvent): void {
-    const total = this.seriesResults().length + this.commandResults().length;
+    const total = this.hits().length + this.commandResults().length;
     if (e.key === 'ArrowDown') {
       e.preventDefault();
       this.active.update((a) => (total ? (a + 1) % total : 0));
@@ -362,19 +428,33 @@ export class CommandPaletteComponent {
       this.active.update((a) => (total ? (a - 1 + total) % total : 0));
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      this.pick(this.active());
+      // Cmd/Ctrl+Enter is the Bloomberg "GO" semantic: chart only this one.
+      this.pick(this.active(), e.metaKey || e.ctrlKey);
     } else if (e.key === 'Escape') {
       e.preventDefault();
       this.svc.close();
     }
   }
 
-  pick(index: number): void {
-    const series = this.seriesResults();
+  pick(index: number, only = false): void {
+    const series = this.hits();
     if (index < series.length) {
-      // Toggle + stay open: type the next ticker straight away.
-      this.sel.toggle(series[index].id);
+      const hit = series[index];
+      if (hit.status && hit.status !== 'ok') return; // blocked rows explain themselves
+      if (only) {
+        this.sel.select(hit.id);
+        this.svc.close();
+        return;
+      }
+      // Toggle + stay open: type the next ticker straight away. This conveyor
+      // behaviour is what makes rapid multi-add work; do not "fix" it into a
+      // dialog that closes on pick.
+      const { evicted } = this.sel.toggle(hit.id);
+      this.evicted.set(
+        evicted ? { id: evicted, symbol: SERIES[evicted]?.symbol ?? evicted, added: hit.id } : null,
+      );
       this.query.set('');
+      this.session.setQuery('');
       this.active.set(0);
       const el = this.box()?.nativeElement;
       if (el) {
