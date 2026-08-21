@@ -4,6 +4,7 @@ import {
   GlyphId,
   PaletteId,
   PaletteVariant,
+  RETIRED_PALETTES,
   SERIES_PALETTES,
   readableOn,
 } from './series-palettes';
@@ -52,7 +53,11 @@ export class SeriesColorService {
 
   readonly variant = computed<PaletteVariant>(() => SERIES_PALETTES[this.palette()]);
 
-  /** Whether on-canvas markers should be drawn for the current settings. */
+  /**
+   * Whether the shape channel is on. ONE preference for both surfaces: with
+   * shapes off the chrome falls back to a dot everywhere, so the legend, tags,
+   * tree and search rows can never disagree with the lines about identity.
+   */
   readonly markersOn = computed(() => {
     const m = this.markerMode();
     return m === 'always' ? true : m === 'never' ? false : this.variant().markersDefault;
@@ -60,9 +65,6 @@ export class SeriesColorService {
 
   constructor() {
     effect(() => {
-      // Mirrors ThemeService: a root attribute lets CSS react to the palette
-      // (e.g. the heavier focus ring under high-contrast) without prop-drilling.
-      document.documentElement.setAttribute('data-palette', this.palette());
       try {
         localStorage.setItem(PALETTE_KEY, this.palette());
       } catch {
@@ -112,6 +114,19 @@ export class SeriesColorService {
     });
   }
 
+  /**
+   * Slot map for a history snapshot. Slots are path-dependent — `sync()` frees a
+   * removed series' slot for the next arrival — so undoing a removal without
+   * restoring these hands the series back in someone else's colour.
+   */
+  slotSnapshot(): readonly (readonly [string, number])[] {
+    return [...this.slots()];
+  }
+
+  restoreSlots(entries: readonly (readonly [string, number])[]): void {
+    this.slots.set(new Map(entries));
+  }
+
   /** id -> concrete hex for the active theme and palette. */
   readonly colorMap = computed<ReadonlyMap<string, string>>(() => {
     const t = this.theme.theme();
@@ -126,12 +141,23 @@ export class SeriesColorService {
   /** id -> glyph for the active palette. Mirrors `colorMap` exactly. */
   readonly glyphMap = computed<ReadonlyMap<string, GlyphId>>(() => {
     const { entries, glyphs } = this.variant();
+    const on = this.markersOn();
     const m = new Map<string, GlyphId>();
     for (const [id, slot] of this.slots()) {
-      m.set(id, glyphs.length ? glyphs[Math.floor(slot / entries.length) % glyphs.length] : 'circle');
+      m.set(
+        id,
+        on && glyphs.length
+          ? glyphs[Math.floor(slot / entries.length) % glyphs.length]
+          : 'circle',
+      );
     }
     return m;
   });
+
+  /** Stroke weight for this palette — heavier where luminance carries identity. */
+  lineWidth(): number {
+    return this.variant().lineWidth ?? 2;
+  }
 
   /** Reactive lookup for templates/computeds (tracks colorMap + theme). */
   color(id: string): string {
@@ -149,11 +175,14 @@ export class SeriesColorService {
 
   private readPalette(): PaletteId {
     try {
-      const raw = localStorage.getItem(PALETTE_KEY) as PaletteId | null;
-      if (raw && raw in SERIES_PALETTES) return raw;
+      const raw = localStorage.getItem(PALETTE_KEY);
+      if (raw && raw in SERIES_PALETTES) return raw as PaletteId;
+      // A palette we have since retired is still a stated preference — carry it
+      // to its successor instead of treating the person as undecided.
+      if (raw && raw in RETIRED_PALETTES) return RETIRED_PALETTES[raw];
       // Never chosen: honour the OS request for more contrast rather than
       // making someone who already asked the system ask us again.
-      if (matchMedia('(prefers-contrast: more)').matches) return 'high-contrast';
+      if (matchMedia('(prefers-contrast: more)').matches) return 'mono';
     } catch {
       /* ignore */
     }

@@ -28,6 +28,13 @@ export interface ResultRow {
  * listbox breaks option counting in NVDA and JAWS. The consequence is that
  * mousedown must be prevented, or the input blurs and the surface closes before
  * the click lands.
+ *
+ * Two shapes, one template. Standalone (the toolbar dropdown, the browse dock)
+ * it IS the listbox. `embedded` makes it a `role="group"` inside someone else's
+ * listbox — the ⌘K palette, which interleaves recent queries and actions with
+ * these rows and therefore has to own the listbox and the index space. Hence
+ * `indexOffset`: the component emits and compares GLOBAL indices, so no caller
+ * has to translate between two numbering schemes.
  */
 @Component({
   selector: 'ts-search-results',
@@ -37,22 +44,22 @@ export interface ResultRow {
   template: `
     <div
       class="list"
-      role="listbox"
-      [attr.id]="listboxId()"
-      [attr.aria-label]="'Series results'"
+      [attr.role]="embedded() ? 'group' : 'listbox'"
+      [attr.id]="embedded() ? null : listboxId()"
+      [attr.aria-label]="embedded() ? groupLabel() : 'Series results'"
     >
       @for (r of rows(); track r.hit.id; let i = $index) {
         <div
           class="row"
           role="option"
-          [attr.id]="listboxId() + '-opt-' + i"
-          [class.is-active]="active() === i"
+          [attr.id]="listboxId() + '-opt-' + (indexOffset() + i)"
+          [class.is-active]="active() === indexOffset() + i"
           [class.is-blocked]="!!r.blocked"
-          [attr.aria-selected]="active() === i"
+          [attr.aria-selected]="active() === indexOffset() + i"
           [attr.aria-disabled]="!!r.blocked"
           (mousedown)="$event.preventDefault()"
-          (mouseenter)="hover.emit(i)"
-          (click)="pick.emit(i)"
+          (mouseenter)="hover.emit(indexOffset() + i)"
+          (click)="pick.emit(indexOffset() + i)"
         >
           <ts-glyph
             [glyph]="r.glyph"
@@ -175,6 +182,11 @@ export class SearchResultsComponent {
   readonly hits = input.required<readonly SeriesHit[]>();
   readonly active = input.required<number>();
   readonly listboxId = input<string>('ts-search');
+  /** Render as a `role="group"` inside a caller-owned listbox. */
+  readonly embedded = input(false);
+  /** Index of this group's first row in the caller's global row list. */
+  readonly indexOffset = input(0);
+  readonly groupLabel = input('Series');
   readonly pick = output<number>();
   readonly hover = output<number>();
 

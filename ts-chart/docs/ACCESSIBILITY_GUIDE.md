@@ -55,22 +55,39 @@ cannot drift apart:
 **On the default palette the glyph is a circle**, so adopting the channel is
 visually free until a palette that needs it is selected.
 
+**The channel is one preference, not two.** "Series shapes" (Auto / On / Off,
+`tschart.markers`) governs the canvas marks *and* the glyph in every chrome
+surface, through the single choke point `SeriesColorService.glyph()`. Before,
+`never` stripped shapes from the lines and left them in the legend, so the two
+halves of the same identity system disagreed.
+
 ---
 
-## 3. The five palettes
+## 3. The three palettes
 
 | id | Label | Colours | Glyphs | Slots | For |
 |---|---|---|---|---|---|
 | `default` | Default | 24 | — | 24 | Unimpaired colour vision |
 | `cvd-rg` | Red–green safe | 8 (Okabe–Ito) | ●■▲ | 24 | Deutan + protan |
-| `cvd-by` | Blue–yellow safe | 8 | ●■▲ | 24 | Tritan |
-| `high-contrast` | High contrast | 6, `lineWidth: 3` | ●■▲◆ | 24 | Low vision, glare, projectors |
-| `mono` | Shape-first | 4 tones of one hue | ●■▲◆✕✚ | 24 | Achromatopsia, greyscale print |
+| `mono` | Shape-first | 4 tones of one hue, `lineWidth: 3` | ●■▲◆✕✚ | 24 | Achromatopsia, greyscale print, low vision, glare, projectors |
 
 **One "Red–green safe", not two.** Deutan and protan simulations of a
 blue/orange/yellow/purple set are near-identical, so offering both would ask the
 user to self-diagnose a condition most people know only as *"some colours look
 the same to me"*. See playbook §38.
+
+**Three, not five.** `cvd-by` (tritan) and `high-contrast` were retired in round
+13. Tritan is rare enough (~0.01%) that its own menu row cost more readers than
+it served, and high-contrast's distinguishing promise — a heavier stroke — was
+never wired: its `lineWidth: 3` was dead code while the chart hard-coded 2.
+Shape-first now carries that stroke and covers the same low-vision/glare need,
+because maximum luminance separation is what it already was.
+
+**Retired ids migrate, they do not reset.** `RETIRED_PALETTES` maps
+`cvd-by → cvd-rg` and `high-contrast → mono` in `readPalette()`. A stored id we
+no longer ship is still a stated preference; letting it fall through to the
+"never chosen" branch would silently re-decide for the one person who had
+already decided.
 
 ### Lightness is deliberately NOT normalised here
 
@@ -137,11 +154,11 @@ precisely why shape has to carry identity instead.
 | Preference | Key | Why not the workspace |
 |---|---|---|
 | Palette | `tschart.palette` | An accessibility setting is a fact about the *person*, not about this screen. It must survive "Reset layout" and apply before any workspace restore paints. |
-| Line markers | `tschart.markers` | Same. |
+| Series shapes | `tschart.markers` | Same. |
 
-When the user has never chosen, `prefers-contrast: more` selects
-`high-contrast` — someone who already told the OS should not have to tell us
-again. An explicit choice wins from then on.
+When the user has never chosen, `prefers-contrast: more` selects `mono` —
+someone who already told the OS should not have to tell us again. An explicit
+choice wins from then on.
 
 ---
 
@@ -186,7 +203,9 @@ summary on the chart host, a visible-on-focus skip link to the table,
 - [ ] Markers stay sparse when zoomed in and disappear above 12 series
 - [ ] Tab through search: combobox → options → footer, with a visible focus ring
 - [ ] One screen-reader pass over the search combobox (option count, activedescendant, "on chart")
-- [ ] `prefers-contrast: more` selects High contrast on a profile that never chose
+- [ ] `prefers-contrast: more` selects Shape-first on a profile that never chose
+- [ ] A stored `high-contrast` / `cvd-by` resolves to its successor, not to Default
+- [ ] Series shapes = Off leaves no glyph anywhere — canvas AND legend/tag/tree/search
 
 ---
 

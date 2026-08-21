@@ -57,6 +57,15 @@ export class SearchService {
   /** Shared across sessions: same query from two surfaces costs one request. */
   private readonly cache = new Map<string, { at: number; hits: readonly SeriesHit[]; total: number; took: number }>();
 
+  /**
+   * Resolve known ids to hits — for "recent" rows, which are a list of ids, not
+   * a query. Going through the provider is the point: a row that reads the local
+   * catalog directly is a row that breaks the day the backend lands.
+   */
+  lookup(ids: readonly string[]): Promise<readonly SeriesHit[]> {
+    return ids.length ? this.provider.lookup(ids) : Promise.resolve([]);
+  }
+
   createSession(opts: SearchSessionOptions = {}): SearchSession {
     const pageSize = opts.pageSize ?? 25;
     const provider = this.provider;

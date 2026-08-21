@@ -1,4 +1,5 @@
-import { ChangeDetectionStrategy, Component, computed, input, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, input, signal } from '@angular/core';
+import { CardActionsService } from '../../core/card-actions.service';
 import { ScrollingModule } from '@angular/cdk/scrolling';
 import { LucideAngularModule } from 'lucide-angular';
 import { ChartedSeries, ChartMode, SeriesMeta } from '../../data/models';
@@ -164,6 +165,14 @@ interface MatrixRow {
   ],
 })
 export class DataTableComponent {
+  private readonly cardActions = inject(CardActionsService);
+
+  constructor() {
+    // The ⌘K "Download CSV" / "Copy for Excel" commands run through here.
+    this.cardActions.registerTable(this);
+    inject(DestroyRef).onDestroy(() => this.cardActions.unregisterTable(this));
+  }
+
   readonly series = input.required<ChartedSeries[]>();
   readonly interval = input<IntervalKey>('6M');
   readonly range = input<CustomRange | null>(null);

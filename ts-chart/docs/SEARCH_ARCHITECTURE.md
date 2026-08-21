@@ -211,3 +211,32 @@ in the sort (`_score desc, symbol.raw asc`) or pages duplicate rows.
 
 **Do not** reintroduce a catalog import in a component to "just get this
 working" — that is the one change that silently un-does all of the above.
+
+---
+
+## 8. Recent queries and the palette's row model (round 14)
+
+**Recent searches are text, not ids.** `RecentQueriesService`
+(`src/app/search/recent-queries.service.ts`, key `tschart.recentq`, max 8) is
+separate from `SelectionService.recentIds`, which is recently *charted series*. A
+trader repeats a query far more often than they re-pick one id out of it.
+
+Committed on a **successful pick** in either surface (`command-palette` and
+`toolbar-search` `pick()`), never in `setQuery` — recording per keystroke fills
+the list with `t`, `tt`, `ttf`.
+
+**"Recent" rows resolve through the provider.** `SearchService.lookup(ids)` wraps
+`provider.lookup()`; no surface reads `SERIES` to build a row. That was the last
+place the catalog leaked into the UI, and it is exactly what breaks on the day the
+backend lands.
+
+**One listbox, three groups.** The ⌘K palette interleaves recent queries, series
+hits and actions, so it owns the `role="listbox"` and a single flat index space;
+`SearchResultsComponent` renders as a `role="group"` inside it via
+`[embedded]="true"` and `[indexOffset]`, emitting GLOBAL indices so no caller
+translates between two numbering schemes. Standalone (toolbar dropdown, browse
+dock) the component is still the listbox itself.
+
+The reason this matters is not tidiness: `aria-activedescendant` can only name a
+row inside the listbox it points at. Before this, command rows were `<button>`s
+outside the listbox and a screen reader never heard the highlight move onto them.

@@ -69,10 +69,12 @@ import { ExportService } from '../../core/export.service';
           <span class="pref__label">
             <lucide-icon name="accessibility" [size]="15" /> Series colors
           </span>
-          <div class="palettes">
+          <div class="palettes" role="radiogroup" aria-label="Series colors">
             @for (p of palettes; track p.id) {
               <button
                 class="pal"
+                role="radio"
+                [attr.aria-checked]="colors.palette() === p.id"
                 [class.is-active]="colors.palette() === p.id"
                 (click)="colors.setPalette(p.id)"
                 [tsTooltip]="p.hint"
@@ -92,11 +94,13 @@ import { ExportService } from '../../core/export.service';
 
         <div class="pref">
           <span class="pref__label">
-            <lucide-icon name="crosshair" [size]="15" /> Line markers
+            <lucide-icon name="crosshair" [size]="15" /> Series shapes
           </span>
-          <div class="ts-segmented">
+          <div class="ts-segmented" role="radiogroup" aria-label="Series shapes">
             @for (m of markerModes; track m.id) {
               <button
+                role="radio"
+                [attr.aria-checked]="colors.markerMode() === m.id"
                 [class.is-active]="colors.markerMode() === m.id"
                 (click)="colors.setMarkerMode(m.id)"
                 [tsTooltip]="m.hint"
@@ -365,8 +369,12 @@ export class UserMenuComponent {
   readonly palettes = PALETTE_LIST;
   readonly markerModes: { id: MarkerMode; label: string; hint: string }[] = [
     { id: 'auto', label: 'Auto', hint: 'On for palettes that need shape to tell series apart' },
-    { id: 'always', label: 'On', hint: 'Always mark lines with their identity shape' },
-    { id: 'never', label: 'Off', hint: 'Color and the right-edge label only' },
+    {
+      id: 'always',
+      label: 'On',
+      hint: 'Shapes on the lines and beside every series name',
+    },
+    { id: 'never', label: 'Off', hint: 'Color and the right-edge label only — plain dots' },
   ];
   private readonly exportSvc = inject(ExportService);
 

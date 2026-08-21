@@ -11,7 +11,18 @@ export interface PaletteEntry {
 /** Non-color identity channel. Drawn in chrome always; on canvas conditionally. */
 export type GlyphId = 'circle' | 'square' | 'triangle' | 'diamond' | 'cross' | 'plus';
 
-export type PaletteId = 'default' | 'cvd-rg' | 'cvd-by' | 'high-contrast' | 'mono';
+export type PaletteId = 'default' | 'cvd-rg' | 'mono';
+
+/**
+ * Palettes that shipped once and were retired, mapped to their successor.
+ * A retired id must resolve to the variant that serves the same need — falling
+ * through to "no preference" would silently re-decide for someone who had
+ * already chosen.
+ */
+export const RETIRED_PALETTES: Readonly<Record<string, PaletteId>> = {
+  'cvd-by': 'cvd-rg',
+  'high-contrast': 'mono',
+};
 
 export interface PaletteVariant {
   id: PaletteId;
@@ -24,7 +35,7 @@ export interface PaletteVariant {
   glyphs: readonly GlyphId[];
   /** Whether on-canvas markers are on when the user leaves markers on `auto`. */
   markersDefault: boolean;
-  /** Optional heavier stroke (high-contrast). */
+  /** Optional heavier stroke. Read by the chart when building line specs. */
   lineWidth?: number;
 }
 
@@ -85,40 +96,11 @@ const CVD_RG_ENTRIES: readonly PaletteEntry[] = [
 ];
 
 /**
- * Blue–yellow safe (tritanopia). The impaired axis is blue↔yellow, so this
- * leans on red, green, purple and orange — which deutan/protan users cannot
- * use, and tritan users can. Offered separately for exactly that reason.
- */
-const CVD_BY_ENTRIES: readonly PaletteEntry[] = [
-  { dark: '#f0736a', light: '#a8342c' }, // red
-  { dark: '#74c77a', light: '#2c7a36' }, // green
-  { dark: '#c49bf0', light: '#6b4ca8' }, // purple
-  { dark: '#f0a34a', light: '#8f5300' }, // orange
-  { dark: '#e0607f', light: '#9c2f4e' }, // pink
-  { dark: '#a8d16f', light: '#4f7a18' }, // lime
-  { dark: '#d97bd9', light: '#8a3a8a' }, // magenta
-  { dark: '#b0b8c0', light: '#525d69' }, // slate
-];
-
-/**
- * High contrast: maximum luminance separation, low chroma, heavier stroke.
- * Serves low vision, glare and projectors as much as CVD. Six slots only —
- * past that, luminance steps stop being reliably distinguishable and the
- * glyph channel takes over.
- */
-const HIGH_CONTRAST_ENTRIES: readonly PaletteEntry[] = [
-  { dark: '#ffffff', light: '#000000' },
-  { dark: '#9ed2ff', light: '#0b3d6b' },
-  { dark: '#ffd166', light: '#6b4a00' },
-  { dark: '#7fe3b0', light: '#00563a' },
-  { dark: '#ff9aa8', light: '#8a0f1e' },
-  { dark: '#c9b8ff', light: '#3b2478' },
-];
-
-/**
- * Shape-first: one hue at four lightness steps. For achromatopsia, monochrome
- * displays and black-and-white print — and the honest fallback for anything the
- * other variants miss. Identity is carried almost entirely by the glyph.
+ * Shape-first: one hue at four lightness steps, drawn with a heavier stroke.
+ * For achromatopsia, monochrome displays and black-and-white print — and, since
+ * it also maximises luminance separation, the variant that serves low vision,
+ * glare and projectors. The honest fallback for anything the other two miss:
+ * identity is carried almost entirely by the glyph.
  */
 const MONO_ENTRIES: readonly PaletteEntry[] = [
   { dark: '#f3f6f9', light: '#12151a' },
@@ -148,38 +130,26 @@ export const SERIES_PALETTES: Record<PaletteId, PaletteVariant> = {
     glyphs: ['circle', 'square', 'triangle'],
     markersDefault: true,
   },
-  'cvd-by': {
-    id: 'cvd-by',
-    label: 'Blue–yellow safe',
-    hint: 'For blue–yellow color-vision deficiency. 8 colors × 3 shapes.',
-    entries: CVD_BY_ENTRIES,
-    glyphs: ['circle', 'square', 'triangle'],
-    markersDefault: true,
-  },
-  'high-contrast': {
-    id: 'high-contrast',
-    label: 'High contrast',
-    hint: 'Maximum separation and a heavier line. Good in glare or on a projector.',
-    entries: HIGH_CONTRAST_ENTRIES,
-    glyphs: ['circle', 'square', 'triangle', 'diamond'],
-    markersDefault: false,
-    lineWidth: 3,
-  },
   mono: {
     id: 'mono',
     label: 'Shape-first',
-    hint: 'One hue, four tones. Shape carries identity — survives a grayscale print.',
+    hint: 'One hue, four tones, heavier lines. Shape carries identity — survives glare, a projector, or a grayscale print.',
     entries: MONO_ENTRIES,
     glyphs: ['circle', 'square', 'triangle', 'diamond', 'cross', 'plus'],
     markersDefault: true,
+    lineWidth: 3,
   },
 };
 
+/**
+ * Three variants, not five. Every extra option in an accessibility menu is a
+ * self-diagnosis the reader has to make before they can use the app; the trio
+ * covers hue-blind (cvd-rg), colourless/low-vision/glare (mono), and everyone
+ * else (default).
+ */
 export const PALETTE_LIST: readonly PaletteVariant[] = [
   SERIES_PALETTES.default,
   SERIES_PALETTES['cvd-rg'],
-  SERIES_PALETTES['cvd-by'],
-  SERIES_PALETTES['high-contrast'],
   SERIES_PALETTES.mono,
 ];
 

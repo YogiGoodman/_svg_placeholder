@@ -9,7 +9,7 @@ import {
   ChartCandlestick, ChartLine, Palette, LayoutGrid, CircleAlert, Layers,
   Square, Trash2, Minus, Plus, UnfoldHorizontal, CalendarRange, Copy, Crosshair,
   ListTree, ZoomIn, ZoomOut, GripVertical, Accessibility, Contrast, LoaderCircle,
-  CornerDownLeft, Command, Filter,
+  CornerDownLeft, Command, Filter, Undo2, Redo2, Clock,
 } from 'lucide-angular';
 
 export const APP_ICONS = {
@@ -21,5 +21,5 @@ export const APP_ICONS = {
   ChartCandlestick, ChartLine, Palette, LayoutGrid, CircleAlert, Layers,
   Square, Trash2, Minus, Plus, UnfoldHorizontal, CalendarRange, Copy, Crosshair,
   ListTree, ZoomIn, ZoomOut, GripVertical, Accessibility, Contrast, LoaderCircle,
-  CornerDownLeft, Command, Filter,
+  CornerDownLeft, Command, Filter, Undo2, Redo2, Clock,
 };

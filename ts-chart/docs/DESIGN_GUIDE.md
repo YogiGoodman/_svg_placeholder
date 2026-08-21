@@ -270,8 +270,11 @@ swatch, and right-edge label. Past ~24 series hues repeat; that is acceptable
 because the label (below) is the real identifier.
 
 **7.2 The right-edge label is the identifier — not the line color.** Each tracked
-series gets a colored pill at the right edge carrying **symbol + value**,
-vertically de-overlapped and sorted. At high N you identify a series by reading
+series gets a colored label at the right edge carrying **symbol + value**, vertically
+de-overlapped and sorted, and **split at the axis border**: the symbol sits on the
+pane, the value in the price-scale lane where values already live. Its last point
+carries a clickable handle — the lead series' one is ringed — that reveals that
+series' individual observations. At high N you identify a series by reading
 these labels, not by tracing a hue through a tangle of lines. Lines are **always
 solid**; dash/dot is reserved for *semantic* distinctions (forecast vs actual,
 data vintage) and must never be spent on identity.
@@ -311,9 +314,10 @@ slot -> { colour: entries[slot % entries.length],
           glyph:  glyphs[floor(slot / entries.length)] }
 ```
 
-Five palettes ship: Default (24 hues), Red–green safe (Okabe–Ito, 8 × 3 shapes),
-Blue–yellow safe, High contrast (6, heavier stroke) and Shape-first (4 tones,
-shape carries identity). All five expose 24 slots, so no consumer changes.
+Three palettes ship: Default (24 hues), Red–green safe (Okabe–Ito, 8 × 3 shapes)
+and Shape-first (4 tones + heavier stroke, shape carries identity). All three
+expose 24 slots, so no consumer changes. Three, not five: every extra row in an
+accessibility menu is one more self-diagnosis before the app can be used.
 
 Two rules that look like details and are not:
 
@@ -347,3 +351,21 @@ every mode, so it must never be hidden behind one.
 The browse dock has a **resizer with zero layout width**: the element is
 `width: 0` and both its 7px hit area and 2px line are pseudo-elements straddling
 the border, invisible until hover with a 120ms delay. Adding it moved nothing.
+
+---
+
+## 12. The ⌘K palette is a finder, not a settings drawer (round 14)
+
+What earns a row: **recent searches**, **series**, and actions that are
+*destructive* (undo/redo, clear), *export* (CSV, copy, screenshot) or otherwise
+have no always-visible control (theme, reset layout).
+
+What was removed: three layout commands, five mode commands and three panel
+toggles. Every one of them is a visible one-click control on the card header or
+the rail, and a palette that lists the settings menu stops being the place you
+type a ticker.
+
+Undo/redo also appear as a button pair in the **chart card header**, beside copy
+and screenshot — not in the app toolbar. What they undo is what that card shows,
+and their tooltips name the action ("Undo remove TTF"), because a button labelled
+only "Undo" tells you nothing about what is about to come back.

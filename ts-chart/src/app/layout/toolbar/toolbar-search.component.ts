@@ -2,9 +2,11 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  effect,
   ElementRef,
   inject,
   signal,
+  untracked,
   viewChild,
 } from '@angular/core';
 import { OverlayModule } from '@angular/cdk/overlay';
@@ -16,6 +18,8 @@ import { SearchService } from '../../search/search.service';
 import { toHit } from '../../search/search.types';
 import { SERIES } from '../../data/series-catalog.data';
 import { CommandPaletteService } from '../command-palette/command-palette.component';
+import { SearchFocusService } from '../../search/search-focus.service';
+import { RecentQueriesService } from '../../search/recent-queries.service';
 
 /**
  * Always-visible search in the top chrome.
@@ -65,7 +69,7 @@ import { CommandPaletteService } from '../command-palette/command-palette.compon
         [cdkConnectedOverlayOrigin]="origin"
         [cdkConnectedOverlayOpen]="open() && !!query().trim()"
         [cdkConnectedOverlayHasBackdrop]="false"
-        [cdkConnectedOverlayWidth]="480"
+        [cdkConnectedOverlayWidth]="dropdownWidth()"
         [cdkConnectedOverlayPositions]="positions"
         (overlayOutsideClick)="open.set(false)"
         (detach)="open.set(false)"
@@ -100,9 +104,12 @@ import { CommandPaletteService } from '../command-palette/command-palette.compon
     `
       :host {
         display: flex;
-        flex: 0 1 420px;
+        /* Fixed, never grows: a search box that eats the whole toolbar reads as
+           the app's main content and moves its own hit target as the window
+           changes. Terminals keep it a stable size. */
+        flex: 0 0 340px;
+        max-width: 340px;
         min-width: 0;
-        justify-content: center;
       }
       .wrap {
         display: flex;
@@ -172,6 +179,8 @@ import { CommandPaletteService } from '../command-palette/command-palette.compon
 })
 export class ToolbarSearchComponent {
   readonly layout = inject(LayoutService);
+  private readonly focusRequests = inject(SearchFocusService);
+  private readonly recentQ = inject(RecentQueriesService);
   readonly palette = inject(CommandPaletteService);
   private readonly sel = inject(SelectionService);
   private readonly search = inject(SearchService);
@@ -181,6 +190,16 @@ export class ToolbarSearchComponent {
   });
 
   private readonly box = viewChild<ElementRef<HTMLInputElement>>('box');
+  private readonly hostEl = inject<ElementRef<HTMLElement>>(ElementRef);
+
+  /**
+   * Anchored at the input's left edge and at least as wide as it, widened to a
+   * readable minimum — a result row carries symbol, name and path, and 340px
+   * of input is not 340px of result.
+   */
+  dropdownWidth(): number {
+    return Math.max(this.hostEl.nativeElement.offsetWidth, 420);
+  }
 
   readonly query = signal('');
   readonly active = signal(0);
@@ -203,6 +222,14 @@ export class ToolbarSearchComponent {
   /** Focus target for the global `/` shortcut. */
   focusInput(): void {
     this.box()?.nativeElement.focus();
+  }
+
+  constructor() {
+    effect(() => {
+      // `requests` is a counter, so every press is a fresh signal read.
+      this.focusRequests.requests();
+      untracked(() => this.focusInput());
+    });
   }
 
   onInput(v: string): void {
@@ -240,6 +267,8 @@ export class ToolbarSearchComponent {
     const hit = this.hits()[index];
     if (!hit) return;
     if (hit.status && hit.status !== 'ok') return;
+    // A pick is the only honest "this query worked" signal; ⌘K reads the same list.
+    this.recentQ.push(this.query());
     if (only) {
       this.sel.select(hit.id);
       this.open.set(false);

@@ -2,23 +2,30 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  DestroyRef,
   effect,
   ElementRef,
   inject,
   Injectable,
   signal,
+  TemplateRef,
   untracked,
+  ViewContainerRef,
   viewChild,
 } from '@angular/core';
+import { A11yModule } from '@angular/cdk/a11y';
+import { Overlay, OverlayRef } from '@angular/cdk/overlay';
+import { TemplatePortal } from '@angular/cdk/portal';
 import { LucideAngularModule } from 'lucide-angular';
 import { SelectionService } from '../../core/selection.service';
 import { SeriesColorService } from '../../core/series-color.service';
 import { ThemeService } from '../../core/theme.service';
 import { LayoutService } from '../../core/layout.service';
-import { MODE_META } from '../../core/modes';
+import { HistoryService } from '../../core/history.service';
+import { CardActionsService } from '../../core/card-actions.service';
 import { SearchService } from '../../search/search.service';
-import { toHit } from '../../search/search.types';
-import { SERIES } from '../../data/series-catalog.data';
+import { SeriesHit } from '../../search/search.types';
+import { RecentQueriesService } from '../../search/recent-queries.service';
 import { SearchResultsComponent } from '../../search/search-results.component';
 
 /** Opens/closes the ⌘K palette (toggled from the global key handler). */
@@ -42,22 +49,39 @@ interface Cmd {
 }
 
 /**
- * ⌘K command palette — Bloomberg-style type-ticker-to-chart plus core app
- * commands. Series selection keeps the palette open (rapid multi-add); the
- * input clears after each pick so the next ticker types straight in.
+ * ⌘K command palette — Bloomberg-style type-ticker-to-chart, plus recent queries
+ * and the handful of actions worth a keyboard-only path. Series selection keeps
+ * the palette open (rapid multi-add); the input clears after each pick so the
+ * next ticker types straight in.
+ *
+ * It is a finder first. Layout, mode and panel commands used to live here and
+ * were removed: every one of them is a visible one-click control on the card
+ * header or the rail, and a palette that lists the settings menu stops being a
+ * place you type a ticker.
+ *
+ * It renders through the CDK overlay rather than a fixed div. Two reasons, both
+ * bugs that were live: a hand-rolled `z-index: 91` sat BELOW the CDK overlay
+ * container (1000), so the user menu painted over the palette; and without a
+ * focus trap Tab walked straight out of an open dialog into the app behind it.
  */
 @Component({
   selector: 'app-command-palette',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [LucideAngularModule, SearchResultsComponent],
+  imports: [A11yModule, LucideAngularModule, SearchResultsComponent],
   template: `
-    @if (svc.open()) {
-      <!-- No scrim. This is the surface a trader opens WHILE watching the tape;
-           a veil over live data failed desk review, and blur reads as a smudge.
-           Separation is elevation and shadow. Outside click closes it. -->
-      <div class="catcher" (click)="svc.close()"></div>
-      <div class="panel" role="dialog" aria-label="Command palette">
+    <!-- No scrim. This is the surface a trader opens WHILE watching the tape;
+         a veil over live data failed desk review, and blur reads as a smudge.
+         Separation is elevation and shadow. Outside click closes it. -->
+    <ng-template #panelTpl>
+      <div
+        class="panel"
+        cdkTrapFocus
+        [cdkTrapFocusAutoCapture]="true"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Command palette"
+      >
         <div class="inputrow">
           <lucide-icon name="search" [size]="16" />
           <input
@@ -80,35 +104,78 @@ interface Cmd {
           <span class="kbd">esc</span>
         </div>
 
-        <div class="list">
+        <!-- ONE listbox over every section. The sections are groups inside it,
+             not separate widgets: aria-activedescendant has to be able to name
+             whatever the arrow keys just landed on, and it cannot name a row
+             that lives outside the listbox it points at. -->
+        <div class="list" role="listbox" id="ts-palette" aria-label="Results">
+          @if (recentQueries().length) {
+            <div class="group" id="ts-palette-g-recent">Recent searches</div>
+            <div role="group" aria-labelledby="ts-palette-g-recent">
+              @for (q of recentQueries(); track q; let i = $index) {
+                <div
+                  class="row"
+                  role="option"
+                  [attr.id]="'ts-palette-opt-' + i"
+                  [class.is-active]="active() === i"
+                  [attr.aria-selected]="active() === i"
+                  (mousedown)="$event.preventDefault()"
+                  (mouseenter)="active.set(i)"
+                  (click)="pick(i)"
+                >
+                  <lucide-icon class="cmdic" name="clock" [size]="15" />
+                  <span class="name">{{ q }}</span>
+                  <button
+                    class="drop"
+                    (click)="forgetQuery(q, $event)"
+                    aria-label="Remove from recent searches"
+                  >
+                    <lucide-icon name="x" [size]="12" />
+                  </button>
+                </div>
+              }
+            </div>
+          }
+
           @if (hits().length) {
-            <div class="group">{{ query() ? 'Series' : 'Recent' }}</div>
+            <div class="group">{{ query() ? 'Series' : 'Recently charted' }}</div>
             <ts-search-results
               listboxId="ts-palette"
+              [embedded]="true"
+              [groupLabel]="query() ? 'Series' : 'Recently charted'"
+              [indexOffset]="seriesOffset()"
               [hits]="hits()"
               [active]="active()"
               (hover)="active.set($event)"
               (pick)="pick($event)"
             />
           }
+
           @if (commandResults().length) {
-            <div class="group">Commands</div>
-            @for (c of commandResults(); track c.id; let i = $index) {
-              <button
-                class="row"
-                [class.is-active]="active() === hits().length + i"
-                (mouseenter)="active.set(hits().length + i)"
-                (click)="pick(hits().length + i)"
-              >
-                <lucide-icon class="cmdic" [name]="c.icon" [size]="15" />
-                <span class="name">{{ c.label }}</span>
-                @if (c.shortcut) {
-                  <span class="kbd">{{ c.shortcut }}</span>
-                }
-              </button>
-            }
+            <div class="group" id="ts-palette-g-actions">Actions</div>
+            <div role="group" aria-labelledby="ts-palette-g-actions">
+              @for (c of commandResults(); track c.id; let i = $index) {
+                <div
+                  class="row"
+                  role="option"
+                  [attr.id]="'ts-palette-opt-' + (actionOffset() + i)"
+                  [class.is-active]="active() === actionOffset() + i"
+                  [attr.aria-selected]="active() === actionOffset() + i"
+                  (mousedown)="$event.preventDefault()"
+                  (mouseenter)="active.set(actionOffset() + i)"
+                  (click)="pick(actionOffset() + i)"
+                >
+                  <lucide-icon class="cmdic" [name]="c.icon" [size]="15" />
+                  <span class="name">{{ c.label }}</span>
+                  @if (c.shortcut) {
+                    <span class="kbd">{{ c.shortcut }}</span>
+                  }
+                </div>
+              }
+            </div>
           }
-          @if (!hits().length && !commandResults().length) {
+
+          @if (!total()) {
             <div class="empty">No matches for “{{ query() }}”</div>
           }
         </div>
@@ -129,23 +196,13 @@ interface Cmd {
           <span class="foot__count" role="status" aria-live="polite">{{ countLabel() }}</span>
         </div>
       </div>
-    }
+    </ng-template>
   `,
   styles: [
     `
-      /* Invisible click-catcher, not a veil: it closes the panel on an outside
-         click without putting anything between the trader and the chart. */
-      .catcher {
-        position: fixed;
-        inset: 0;
-        z-index: 90;
-      }
+      /* Position comes from the CDK overlay (global strategy, 18vh from the
+         top), so the panel itself only describes its own box. */
       .panel {
-        position: fixed;
-        top: 18vh;
-        left: 50%;
-        transform: translateX(-50%);
-        z-index: 91;
         width: min(560px, calc(100vw - 32px));
         display: flex;
         flex-direction: column;
@@ -210,6 +267,26 @@ interface Cmd {
         min-width: 0;
         flex: 1;
       }
+      /* Only shown on the row you are on: a column of ✕ in a list you mostly
+         read is noise, and a recent query is removed rarely. */
+      .drop {
+        display: flex;
+        align-items: center;
+        padding: 2px;
+        border-radius: var(--ts-radius-xs);
+        color: var(--ts-text-faint);
+        cursor: pointer;
+        opacity: 0;
+      }
+      .row:hover .drop,
+      .row.is-active .drop,
+      .drop:focus-visible {
+        opacity: 1;
+      }
+      .drop:hover {
+        color: var(--ts-text-bright);
+        background: var(--ts-bg-inset);
+      }
       .evict {
         display: flex;
         align-items: center;
@@ -269,8 +346,17 @@ export class CommandPaletteComponent {
   readonly colors = inject(SeriesColorService);
   private readonly theme = inject(ThemeService);
   private readonly layout = inject(LayoutService);
+  private readonly history = inject(HistoryService);
+  private readonly cardActions = inject(CardActionsService);
+  private readonly recentQ = inject(RecentQueriesService);
+  private readonly overlay = inject(Overlay);
+  private readonly vcr = inject(ViewContainerRef);
 
   private readonly box = viewChild<ElementRef<HTMLInputElement>>('box');
+  private readonly panelTpl = viewChild.required<TemplateRef<unknown>>('panelTpl');
+  private overlayRef: OverlayRef | null = null;
+  /** Where focus came from, so closing puts it back rather than on <body>. */
+  private returnFocusTo: HTMLElement | null = null;
 
   private readonly search = inject(SearchService);
   /** This surface's own session — the toolbar has a separate one so the two
@@ -284,16 +370,27 @@ export class CommandPaletteComponent {
   readonly active = signal(0);
   /** Reported so the user can undo an eviction they did not ask for. */
   readonly evicted = signal<{ id: string; symbol: string; added: string } | null>(null);
+  /** Recently charted series, resolved through the provider (never the catalog). */
+  private readonly recentHits = signal<readonly SeriesHit[]>([]);
 
-  /** Empty query shows recents; otherwise ranked provider hits. */
-  readonly hits = computed(() =>
-    this.query().trim()
-      ? this.session.hits().slice(0, 8)
-      : this.sel.recent().slice(0, 6).map((m) => toHit(m)),
+  /** Recent QUERIES — text, not ids. Only useful before you start typing. */
+  readonly recentQueries = computed(() =>
+    this.query().trim() ? [] : this.recentQ.queries().slice(0, 5),
   );
 
+  /** Empty query shows recently charted series; otherwise ranked provider hits. */
+  readonly hits = computed(() =>
+    this.query().trim() ? this.session.hits().slice(0, 8) : this.recentHits().slice(0, 6),
+  );
+
+  // One flat index space across the three groups, derived in one place — the
+  // arithmetic used to be inlined at four call sites and drifted.
+  readonly seriesOffset = computed(() => this.recentQueries().length);
+  readonly actionOffset = computed(() => this.seriesOffset() + this.hits().length);
+  readonly total = computed(() => this.actionOffset() + this.commandResults().length);
+
   readonly activeId = computed(() =>
-    this.active() < this.hits().length ? `ts-palette-opt-${this.active()}` : null,
+    this.active() < this.total() ? `ts-palette-opt-${this.active()}` : null,
   );
 
   readonly countLabel = computed(() => {
@@ -303,8 +400,67 @@ export class CommandPaletteComponent {
     return total ? `${shown} of ${total} · ${this.session.took()} ms` : 'no matches';
   });
 
+  /**
+   * Actions, not settings. What earns a row here: it is destructive (and so
+   * wants a keyboard path with a name attached), it exports, or it has no other
+   * always-visible control. Layout/mode/panel toggles have one and were dropped.
+   */
   private readonly commands = computed<Cmd[]>(() => {
-    const cmds: Cmd[] = [
+    const cmds: Cmd[] = [];
+    if (this.history.canUndo()) {
+      cmds.push({
+        id: 'undo',
+        label: `Undo ${this.history.undoLabel()}`,
+        icon: 'undo-2',
+        shortcut: '⌘Z',
+        run: () => this.history.undo(),
+      });
+    }
+    if (this.history.canRedo()) {
+      cmds.push({
+        id: 'redo',
+        label: `Redo ${this.history.redoLabel()}`,
+        icon: 'redo-2',
+        shortcut: '⌘⇧Z',
+        run: () => this.history.redo(),
+      });
+    }
+    if (this.sel.count()) {
+      cmds.push({
+        id: 'clear',
+        label: `Clear selection (${this.sel.count()})`,
+        icon: 'trash-2',
+        run: () => this.sel.clear(),
+      });
+    }
+    cmds.push(
+      {
+        id: 'csv',
+        label: 'Download CSV',
+        icon: 'download',
+        run: () => {
+          this.sel.setView('data');
+          this.cardActions.withTable((t) => t.downloadCsv());
+        },
+      },
+      {
+        id: 'copy',
+        label: 'Copy for Excel',
+        icon: 'copy',
+        run: () => {
+          this.sel.setView('data');
+          this.cardActions.withTable((t) => t.copyTable());
+        },
+      },
+      {
+        id: 'shot',
+        label: 'Screenshot chart',
+        icon: 'camera',
+        run: () => {
+          this.sel.setView('chart');
+          this.cardActions.screenshot();
+        },
+      },
       {
         id: 'theme',
         label: this.theme.theme() === 'dark' ? 'Switch to light theme' : 'Switch to dark theme',
@@ -312,62 +468,15 @@ export class CommandPaletteComponent {
         run: () => this.theme.toggleTheme(),
       },
       {
-        id: 'view',
-        label: this.sel.view() === 'chart' ? 'Show data table' : 'Show chart',
-        icon: this.sel.view() === 'chart' ? 'table' : 'chart-line',
-        run: () => this.sel.toggleView(),
+        id: 'reset',
+        label: 'Reset panel layout',
+        icon: 'refresh-cw',
+        run: () => {
+          this.layout.resetSizes();
+          this.layout.closeDrawers();
+        },
       },
-      {
-        id: 'layout-overlay',
-        label: 'Layout: Overlay',
-        icon: 'layers',
-        run: () => this.sel.setLayout('overlay'),
-      },
-      {
-        id: 'layout-split',
-        label: 'Layout: Split panes',
-        icon: 'columns-3',
-        run: () => this.sel.setLayout('split'),
-      },
-      {
-        id: 'layout-single',
-        label: 'Layout: Single',
-        icon: 'square',
-        run: () => this.sel.setLayout('single'),
-      },
-      ...MODE_META.filter((m) => this.sel.allowedModes().includes(m.id)).map((m) => ({
-        id: `mode-${m.id}`,
-        label: `Mode: ${m.label}`,
-        icon: 'chart-line',
-        run: () => this.sel.setChartMode(m.id),
-      })),
-      {
-        id: 'nav',
-        label: 'Toggle navigation panel',
-        icon: 'panel-left',
-        shortcut: '⌘/',
-        run: () => this.layout.toggleLeft(),
-      },
-      {
-        id: 'details',
-        label: 'Toggle details panel',
-        icon: 'panel-right',
-        shortcut: '⌘.',
-        run: () => this.layout.showRight('details'),
-      },
-      {
-        id: 'dxtree',
-        label: 'Toggle DevExtreme tree (POC)',
-        icon: 'list-tree',
-        run: () => this.layout.showRight('dxTree'),
-      },
-      {
-        id: 'clear',
-        label: `Clear selection${this.sel.count() ? ` (${this.sel.count()})` : ''}`,
-        icon: 'trash-2',
-        run: () => this.sel.clear(),
-      },
-    ];
+    );
     return cmds;
   });
 
@@ -378,30 +487,85 @@ export class CommandPaletteComponent {
   });
 
   constructor() {
-    // Focus the input every time the palette opens, and reset state.
-    //
-    // The body MUST be untracked. `session.setQuery()` reads the session's own
-    // signals on the way through, which would register them as dependencies of
-    // this effect — and since the effect also writes them, every keystroke
-    // re-ran it and reset `query` straight back to empty. The only dependency
-    // this effect should have is `svc.open()`.
+    // Open/close drives the overlay. The body MUST be untracked: it writes the
+    // signals the session reads, and a tracked write here re-ran the effect on
+    // every keystroke and reset `query` straight back to empty.
     effect(() => {
       const open = this.svc.open();
+      untracked(() => (open ? this.attach() : this.detach()));
+    });
+
+    // Recents are ids; rows need hits. Resolve through the provider so this
+    // surface never reads the local catalog.
+    effect(() => {
+      const ids = this.sel.recentIds().slice(0, 6);
       untracked(() => {
-        if (!open) return;
-        this.query.set('');
-        this.session.setQuery('');
-        this.active.set(0);
-        this.evicted.set(null);
-        queueMicrotask(() => this.box()?.nativeElement.focus());
+        void this.search.lookup(ids).then((hits) => this.recentHits.set(hits));
       });
     });
+
+    // Keep the highlighted row on screen — the list scrolls at ~8 rows and the
+    // arrow keys used to walk the highlight straight out of view.
+    effect(() => {
+      const id = this.activeId();
+      if (!id) return;
+      untracked(() => {
+        queueMicrotask(() =>
+          document.getElementById(id)?.scrollIntoView({ block: 'nearest' }),
+        );
+      });
+    });
+
+    inject(DestroyRef).onDestroy(() => this.detach());
+  }
+
+  private attach(): void {
+    if (this.overlayRef) return;
+    this.returnFocusTo = document.activeElement as HTMLElement | null;
+    this.query.set('');
+    this.session.setQuery('');
+    this.active.set(0);
+    this.evicted.set(null);
+
+    const ref = this.overlay.create({
+      positionStrategy: this.overlay.position().global().centerHorizontally().top('18vh'),
+      scrollStrategy: this.overlay.scrollStrategies.reposition(),
+      hasBackdrop: false,
+      panelClass: 'ts-palette-pane',
+    });
+    ref.attach(new TemplatePortal(this.panelTpl(), this.vcr));
+    // No backdrop element to click, so listen for pointer events that landed
+    // outside — the panel still never covers the chart with a veil.
+    ref.outsidePointerEvents().subscribe(() => this.svc.close());
+    ref.keydownEvents().subscribe((e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        // Stop here: the workspace's own Escape handler dismisses docks, and
+        // closing the palette must not also close the tree behind it.
+        e.stopPropagation();
+        this.svc.close();
+      }
+    });
+    this.overlayRef = ref;
+    queueMicrotask(() => this.box()?.nativeElement.focus());
+  }
+
+  private detach(): void {
+    this.overlayRef?.dispose();
+    this.overlayRef = null;
+    this.returnFocusTo?.focus?.();
+    this.returnFocusTo = null;
   }
 
   onInput(v: string): void {
     this.query.set(v);
     this.session.setQuery(v);
     this.active.set(0);
+  }
+
+  forgetQuery(q: string, e: Event): void {
+    e.stopPropagation();
+    this.recentQ.remove(q);
   }
 
   undoEvict(): void {
@@ -419,28 +583,52 @@ export class CommandPaletteComponent {
   }
 
   onKey(e: KeyboardEvent): void {
-    const total = this.hits().length + this.commandResults().length;
+    const total = this.total();
     if (e.key === 'ArrowDown') {
       e.preventDefault();
       this.active.update((a) => (total ? (a + 1) % total : 0));
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       this.active.update((a) => (total ? (a - 1 + total) % total : 0));
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      this.active.set(0);
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      this.active.set(Math.max(0, total - 1));
     } else if (e.key === 'Enter') {
       e.preventDefault();
       // Cmd/Ctrl+Enter is the Bloomberg "GO" semantic: chart only this one.
       this.pick(this.active(), e.metaKey || e.ctrlKey);
     } else if (e.key === 'Escape') {
       e.preventDefault();
+      e.stopPropagation();
       this.svc.close();
     }
   }
 
   pick(index: number, only = false): void {
+    const queries = this.recentQueries();
+    if (index < queries.length) {
+      // Re-run the query rather than jumping to a result: the same words can
+      // mean a different set today, and that is usually the point of repeating.
+      this.onInput(queries[index]);
+      const el = this.box()?.nativeElement;
+      if (el) {
+        el.value = queries[index];
+        el.focus();
+      }
+      return;
+    }
+
     const series = this.hits();
-    if (index < series.length) {
-      const hit = series[index];
+    const seriesIndex = index - this.seriesOffset();
+    if (seriesIndex >= 0 && seriesIndex < series.length) {
+      const hit = series[seriesIndex];
       if (hit.status && hit.status !== 'ok') return; // blocked rows explain themselves
+      // A pick is the only honest "this query worked" signal — recording on
+      // keystroke would fill the list with "t", "tt", "ttf".
+      this.recentQ.push(this.query());
       if (only) {
         this.sel.select(hit.id);
         this.svc.close();
@@ -451,7 +639,7 @@ export class CommandPaletteComponent {
       // dialog that closes on pick.
       const { evicted } = this.sel.toggle(hit.id);
       this.evicted.set(
-        evicted ? { id: evicted, symbol: SERIES[evicted]?.symbol ?? evicted, added: hit.id } : null,
+        evicted ? { id: evicted, symbol: this.sel.symbolOf(evicted), added: hit.id } : null,
       );
       this.query.set('');
       this.session.setQuery('');
@@ -463,7 +651,8 @@ export class CommandPaletteComponent {
       }
       return;
     }
-    const cmd = this.commandResults()[index - series.length];
+
+    const cmd = this.commandResults()[index - this.actionOffset()];
     if (cmd) {
       cmd.run();
       this.svc.close();

@@ -76,6 +76,8 @@ interface LegendRow {
   broken: 'forbidden' | 'missing' | null;
 }
 interface ValueTag {
+  /** Series id — stable track identity; y-order is not (it re-sorts). */
+  id: string;
   y: number;
   value: number;
   color: string;
@@ -85,6 +87,19 @@ interface ValueTag {
   glyph: GlyphId;
   /** Series symbol — the authoritative identifier at high series counts. */
   label: string;
+}
+
+/** Clickable handle on a series' last point (pane-relative px). */
+interface LastDot {
+  id: string;
+  x: number;
+  y: number;
+  color: string;
+  label: string;
+  /** First series in selection order — carries the ring + glow. */
+  lead: boolean;
+  /** This series is currently showing its individual observations. */
+  on: boolean;
 }
 
 type Point = { time: string; value: number };
@@ -117,7 +132,13 @@ interface ActiveSeries {
   kind: SeriesType;
   color: string;
   last: number;
+  /** Time of the last point — anchors the last-point dot on the time axis. */
+  lastTime?: string;
   track: boolean;
+  /** Line width from the spec, so focus can thicken without losing the base. */
+  baseWidth: number;
+  /** Spec-level per-point markers (forward curves), so focus can't clear them. */
+  basePoints: boolean;
   dataRef: readonly unknown[];
   /** Lazy time -> value index for crosshair sync (invalidated with dataRef). */
   timeMap?: Map<string, number>;
@@ -144,6 +165,22 @@ const GLYPH_TO_MARKER: Partial<Record<GlyphId, SeriesMarkerShape>> = {
 const MARKERS_PER_SERIES = 6;
 /** Past this many drawn series, markers stop helping and start crowding. */
 const MARKER_SERIES_CAP = 12;
+
+/** Value-tag chip box at --ts-fs-xxs + 1px padding, and the breathing room
+ *  between two stacked chips. Under heavy compression the gap goes to zero and
+ *  the chips touch (TradingView does the same) rather than one being dropped. */
+const TAG_H = 16;
+const TAG_GAP = 2;
+/** Height of the time-axis strip the tags must stay clear of. */
+const AXIS_H = 26;
+/** Floor for the value lane before the axis has measured itself. */
+const MIN_SCALE_W = 56;
+/**
+ * Focus draws a circle at every point of ONE series. The honest test is not how
+ * many points there are but how much room each one gets: below this bar spacing
+ * the circles touch and read as a bead, so focus falls back to a heavier line.
+ */
+const MIN_POINT_SPACING = 11;
 
 const SERIES_DEF: Record<SeriesType, SeriesDefinition<SeriesType>> = {
   Line: LineSeries as SeriesDefinition<SeriesType>,
@@ -176,7 +213,18 @@ const SERIES_DEF: Record<SeriesType, SeriesDefinition<SeriesType>> = {
         <div class="legend__rows">
           @for (row of visibleRows(); track row.id) {
             <div class="lrow" [class.is-hidden]="row.hidden || row.unsupported || !!row.broken">
-              <ts-glyph class="lrow__dot" [glyph]="row.glyph" [color]="row.color" [size]="8" />
+              <button
+                class="lrow__dot"
+                [class.is-on]="focusedId() === row.id"
+                (click)="toggleFocus(row.id)"
+                [disabled]="row.hidden || row.unsupported || !!row.broken"
+                [tsTooltip]="
+                  focusedId() === row.id ? 'Hide data points' : 'Show data points for this series'
+                "
+                [attr.aria-pressed]="focusedId() === row.id"
+              >
+                <ts-glyph [glyph]="row.glyph" [color]="row.color" [size]="8" />
+              </button>
               <button
                 class="lrow__label ts-truncate"
                 (click)="openInspector()"
@@ -254,20 +302,49 @@ const SERIES_DEF: Record<SeriesType, SeriesDefinition<SeriesType>> = {
       </div>
       }
 
-      <!-- Right-edge per-series identity labels (symbol + value) — the
-           authoritative way to tell many lines apart; solid lines don't scale
-           on hue alone past the palette core. -->
-      @for (tag of valueTags(); track $index) {
-        <div
-          class="lastval ts-mono"
-          [style.top.px]="tag.y"
-          [style.background]="tag.color"
-          [style.color]="tag.on"
-        >
-          <ts-glyph [glyph]="tag.glyph" [color]="tag.on" [size]="7" />
-          <span class="lastval__sym">{{ tag.label }}</span>
-          <span class="lastval__val">{{ fmt(tag.value) }}</span>
+      <!-- Right-edge per-series identity labels — the authoritative way to
+           tell many lines apart; solid lines don't scale on hue alone past the
+           palette core. Two chips, not one: the NAME sits on the pane, the
+           VALUE sits in the price-axis lane where values already live, so a
+           label never has to cover a tick to be read. -->
+      @for (tag of valueTags(); track tag.id) {
+        <div class="lastval ts-mono" [style.top.px]="tag.y">
+          <span
+            class="lastval__name"
+            [style.background]="tag.color"
+            [style.color]="tag.on"
+          >
+            <ts-glyph [glyph]="tag.glyph" [color]="tag.on" [size]="7" />
+            <span class="lastval__sym">{{ tag.label }}</span>
+          </span>
+          <span
+            class="lastval__val"
+            [style.background]="tag.color"
+            [style.color]="tag.on"
+            [style.width.px]="scaleW()"
+          >
+            {{ fmt(tag.value) }}
+          </span>
         </div>
+      }
+
+      <!-- Last-point handles. The lead series' dot is ringed; clicking any of
+           them shows that series' individual observations. Only last points
+           are hit targets — hit-testing every point would cost a nearest-point
+           search per pointermove. -->
+      @for (d of lastDots(); track d.id) {
+        <button
+          class="lastdot"
+          [class.is-lead]="d.lead"
+          [class.is-on]="d.on"
+          [style.left.px]="d.x"
+          [style.top.px]="d.y"
+          [style.color]="d.color"
+          (click)="toggleFocus(d.id)"
+          [tsTooltip]="d.on ? 'Hide ' + d.label + ' points' : 'Show ' + d.label + ' points'"
+          [attr.aria-label]="(d.on ? 'Hide ' : 'Show ') + d.label + ' data points'"
+          [attr.aria-pressed]="d.on"
+        ></button>
       }
 
       <!-- Vertical marker (today / as-of) -->
@@ -427,11 +504,27 @@ const SERIES_DEF: Record<SeriesType, SeriesDefinition<SeriesType>> = {
         color: var(--ts-text-muted);
         margin-right: 1px;
       }
+      /* The dot is the keyboard route to per-point focus, so it is a real
+         button — but it must still read as a dot, not a control. */
       .lrow__dot {
-        width: 8px;
-        height: 8px;
-        border-radius: 2px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 12px;
+        height: 12px;
+        padding: 0;
+        border: 0;
+        border-radius: var(--ts-radius-xs);
+        background: none;
         flex: none;
+        cursor: pointer;
+      }
+      .lrow__dot:hover:not(:disabled),
+      .lrow__dot.is-on {
+        background: var(--ts-bg-active);
+      }
+      .lrow__dot:disabled {
+        cursor: not-allowed;
       }
       .lrow__label {
         font-size: var(--ts-fs-xs);
@@ -583,30 +676,85 @@ const SERIES_DEF: Record<SeriesType, SeriesDefinition<SeriesType>> = {
          Okabe-Ito yellow) gets dark text instead of unreadable white-on-white. */
       .lastval {
         position: absolute;
-        right: 2px;
+        right: 0;
         z-index: 5;
+        display: flex;
+        align-items: stretch;
+        gap: 1px;
+        max-width: 62%;
+        transform: translateY(-50%);
+        font-size: var(--ts-fs-xxs);
+        font-weight: var(--ts-fw-bold);
+        line-height: 14px;
+        pointer-events: none;
+      }
+      /* Name chip: sits on the pane, right edge flush against the axis lane. */
+      .lastval__name {
         display: inline-flex;
         align-items: center;
         gap: var(--ts-space-1);
-        max-width: 40%;
-        transform: translateY(-50%);
+        min-width: 0;
         padding: 1px var(--ts-space-2);
-        border-radius: var(--ts-radius-xs);
-        font-size: var(--ts-fs-xxs);
-        font-weight: var(--ts-fw-bold);
+        border-radius: var(--ts-radius-xs) 0 0 var(--ts-radius-xs);
         box-shadow: var(--ts-shadow-1);
-        pointer-events: none;
       }
       .lastval__sym {
-        font-weight: var(--ts-fw-bold);
-        opacity: 0.85;
+        /* No opacity dim: at 10px the contrast floor is 4.5:1 and a 0.85 veil
+           spends exactly the margin the readable-ink calculation just bought. */
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
       }
+      /* Value chip: exactly the width of the price scale, text inset to match
+         the axis ticks it sits among. */
       .lastval__val {
-        font-variant-numeric: tabular-nums;
         flex: none;
+        display: inline-flex;
+        align-items: center;
+        padding: 1px var(--ts-space-1) 1px 6px;
+        border-radius: 0 var(--ts-radius-xs) var(--ts-radius-xs) 0;
+        font-variant-numeric: tabular-nums;
+        box-shadow: var(--ts-shadow-1);
+        overflow: hidden;
+      }
+      /* Last-point handle. One animated element at most (the lead series):
+         a pulse per series would repaint N boxes every frame for decoration. */
+      .lastdot {
+        position: absolute;
+        z-index: 6;
+        width: 9px;
+        height: 9px;
+        margin: -4.5px 0 0 -4.5px;
+        padding: 0;
+        border: 1.5px solid var(--ts-bg);
+        border-radius: 50%;
+        background: currentColor;
+        cursor: pointer;
+        pointer-events: auto;
+      }
+      .lastdot.is-lead {
+        box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 26%, transparent);
+        animation: lastdot-pulse 2.6s var(--ts-ease) infinite;
+      }
+      .lastdot.is-on,
+      .lastdot:hover,
+      .lastdot:focus-visible {
+        box-shadow: 0 0 0 4px color-mix(in srgb, currentColor 42%, transparent);
+        animation: none;
+      }
+      @keyframes lastdot-pulse {
+        0%,
+        100% {
+          box-shadow: 0 0 0 2px color-mix(in srgb, currentColor 26%, transparent);
+        }
+        50% {
+          box-shadow: 0 0 0 5px color-mix(in srgb, currentColor 12%, transparent);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .lastdot.is-lead {
+          animation: none;
+        }
       }
       .today {
         position: absolute;
@@ -676,6 +824,8 @@ export class ChartViewComponent implements OnDestroy {
   readonly range = input<CustomRange | null>(null);
 
   private readonly host = viewChild.required<ElementRef<HTMLDivElement>>('host');
+  /** The `.chart-host` wrapper the overlays live in (this component's element). */
+  private readonly hostEl = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly theme = inject(ThemeService);
   readonly sel = inject(SelectionService);
   private readonly colors = inject(SeriesColorService);
@@ -686,6 +836,10 @@ export class ChartViewComponent implements OnDestroy {
   private active: ActiveSeries[] = [];
   private ro?: ResizeObserver;
   private markerTime: string = TODAY;
+
+  /** Widest identity chip measured on the last overlay pass, in px — the strip
+   *  the time axis has to keep clear of the last bar. */
+  private chipStripW = 120;
 
   /** Cached generated data keyed by spec-key + render signature (stable refs
    *  across re-renders so unchanged survivors are never re-`setData`'d). */
@@ -743,6 +897,11 @@ export class ChartViewComponent implements OnDestroy {
   readonly markerX = signal<number | null>(null);
   readonly markerLabel = signal<string>('TODAY');
   readonly valueTags = signal<ValueTag[]>([]);
+  readonly lastDots = signal<LastDot[]>([]);
+  /** Measured width of the right price scale — the value chips' lane. */
+  readonly scaleW = signal(MIN_SCALE_W);
+  /** Series currently showing its own observations (shared across panes). */
+  readonly focusedId = computed(() => this.interaction.focusedId());
 
   /** True while the pointer is physically over this pane — the only pane
    *  allowed to publish crosshair state (loop-proof sync). */
@@ -827,16 +986,29 @@ export class ChartViewComponent implements OnDestroy {
     afterNextRender(() => {
       this.buildChart();
       this.render();
-      this.ro = new ResizeObserver(() => this.updateOverlays());
+      this.ro = new ResizeObserver(() => this.scheduleOverlays());
       this.ro.observe(this.host().nativeElement);
     });
 
-    // Palette or marker-mode change: identity marks are re-derived without a
-    // full data re-render, since only the mapping changed, not the series.
+    // Palette or shape-mode change: identity marks are re-derived without a
+    // full data re-render, since only the mapping changed, not the series. The
+    // whole overlay pass runs, not just the canvas marks — the glyph in the
+    // right-edge chip comes from the same map and must not disagree with the
+    // line it labels.
     effect(() => {
       this.colors.markersOn();
       this.colors.glyphMap();
-      if (this.chart) this.updateMarkers();
+      if (this.chart) this.updateOverlays();
+    });
+
+    // Focus changed (dot click, legend dot, another pane): only series options
+    // move — no data touches the chart.
+    effect(() => {
+      this.interaction.focusedId();
+      if (this.chart) {
+        this.applyFocus();
+        this.updateDots();
+      }
     });
 
     // Re-render when inputs (series list, interval, mode, as-of) or hidden set change.
@@ -892,6 +1064,7 @@ export class ChartViewComponent implements OnDestroy {
   }
 
   ngOnDestroy(): void {
+    if (this.overlayRaf) cancelAnimationFrame(this.overlayRaf);
     this.ro?.disconnect();
     this.chart?.remove();
   }
@@ -902,6 +1075,11 @@ export class ChartViewComponent implements OnDestroy {
 
   toggleHidden(id: string): void {
     this.sel.toggleHidden(id);
+  }
+
+  /** Show/hide the individual observations of one series. */
+  toggleFocus(id: string): void {
+    this.interaction.toggleFocus(id);
   }
   /** Legend row label click → open the on-demand series inspector. */
   openInspector(): void {
@@ -926,6 +1104,44 @@ export class ChartViewComponent implements OnDestroy {
 
   fitAll(): void {
     this.chart?.timeScale().fitContent();
+    this.reserveLabelStrip();
+  }
+
+  /**
+   * Leave the identity chips a lane of their own.
+   *
+   * `rightOffset` is not enough: it is measured in BARS and `fitContent()`
+   * discards it outright, so at a narrow pane width the last bar ends up under
+   * its own label and the handle on it is unclickable. Widen the logical range
+   * instead, by however many bars the measured chip strip is worth right now —
+   * the left edge stays put, so no data leaves the screen.
+   */
+  private reserveLabelStrip(onlyIfFitted = false): void {
+    const ts = this.chart?.timeScale();
+    const r = ts?.getVisibleLogicalRange();
+    if (!ts || !r) return;
+    // On a resize the margin has to be re-derived — the pane got wider in px but
+    // the range is still in bars, so a dock toggle left a band of whitespace.
+    // Only while the view is still the fitted one, though: re-deriving under a
+    // user's own zoom would move the window they chose.
+    if (onlyIfFitted && Math.abs(r.from) > 1) return;
+    let points = 0;
+    for (const a of this.active) points = Math.max(points, a.dataRef.length);
+    const plotW = this.hostEl.nativeElement.clientWidth - this.scaleW();
+    if (points < 2 || plotW <= 0) return;
+
+    // Derive the target from the DATA, not from the current range. Two traps
+    // here, both hit on the way in:
+    //  - `options().barSpacing` is the configured default (6), unrelated to what
+    //    a fit actually produced;
+    //  - extending the range relative to itself compounds, and render() fits more
+    //    than once during boot, so the data ended up a sliver on the left.
+    // Spacing at fit, target `to` from the point count: same answer every call.
+    const spacingAtFit = plotW / points;
+    const bars = Math.min(points / 3, (this.chipStripW + 14) / spacingAtFit);
+    const to = points - 1 + bars;
+    if (bars < 0.5 || Math.abs(r.to - to) < 0.5) return;
+    ts.setVisibleLogicalRange({ from: r.from, to });
   }
 
   // --- chart lifecycle -------------------------------------------------------
@@ -951,6 +1167,10 @@ export class ChartViewComponent implements OnDestroy {
       rightPriceScale: {
         borderColor: this.cssVar('--ts-border'),
         scaleMargins: { top: 0.14, bottom: 0.1 },
+        // The value chips are sized to this lane, so let it stop breathing:
+        // without a floor the axis shrinks to its widest tick and the chips
+        // resize under the reader on every pan.
+        minimumWidth: MIN_SCALE_W,
       },
       timeScale: {
         borderColor: this.cssVar('--ts-border'),
@@ -990,7 +1210,7 @@ export class ChartViewComponent implements OnDestroy {
     });
 
     this.chart.subscribeCrosshairMove((param) => this.onCrosshair(param));
-    this.chart.timeScale().subscribeVisibleLogicalRangeChange(() => this.updateOverlays());
+    this.chart.timeScale().subscribeVisibleLogicalRangeChange(() => this.scheduleOverlays());
   }
 
   private clearSeries(): void {
@@ -1054,6 +1274,8 @@ export class ChartViewComponent implements OnDestroy {
           color: spec.color,
           last: spec.last,
           track: spec.track,
+          baseWidth: Number(spec.options['lineWidth'] ?? 2),
+          basePoints: spec.options['pointMarkersVisible'] === true,
           dataRef: data,
         };
         added = true;
@@ -1064,8 +1286,11 @@ export class ChartViewComponent implements OnDestroy {
       // Recolor survivors in place (theme toggle / slot reassignment).
       if (a.color !== spec.color) a.api.applyOptions(spec.options as never);
       a.last = spec.last;
+      a.lastTime = (data[data.length - 1] as { time?: string } | undefined)?.time;
       a.color = spec.color;
       a.track = spec.track;
+      a.baseWidth = Number(spec.options['lineWidth'] ?? 2);
+      a.basePoints = spec.options['pointMarkersVisible'] === true;
       if (spec.track) {
         this.lastVals[spec.legendId] = spec.last;
         this.prevVals[spec.legendId] = spec.prev;
@@ -1082,11 +1307,13 @@ export class ChartViewComponent implements OnDestroy {
     // build — removing a series must NOT snap the user's zoom.
     if (force || added || sig !== this.lastSigApplied) {
       chart.timeScale().fitContent();
+      this.reserveLabelStrip();
       this.lastSigApplied = sig;
     }
     this.drawnCount.set(specs.length);
     if (specs.length === 0) {
       this.valueTags.set([]);
+      this.lastDots.set([]);
       this.markerX.set(null);
     }
     queueMicrotask(() => this.updateOverlays());
@@ -1154,6 +1381,7 @@ export class ChartViewComponent implements OnDestroy {
   }
 
   private latestSpecs(vis: ChartedSeries[], iv: IntervalKey, type: ChartType): SeriesSpec[] {
+    const lw = this.colors.lineWidth();
     return vis.map((meta) => {
       const data = this.cache(`latest:${meta.id}`, () =>
         this.sliceData(generateLine(meta), iv),
@@ -1162,7 +1390,7 @@ export class ChartViewComponent implements OnDestroy {
       const options = area
         ? {
             lineColor: meta.color,
-            lineWidth: 2,
+            lineWidth: lw,
             topColor: hexA(meta.color, 0.28),
             bottomColor: hexA(meta.color, 0.02),
             priceLineVisible: false,
@@ -1172,7 +1400,7 @@ export class ChartViewComponent implements OnDestroy {
           }
         : {
             color: meta.color,
-            lineWidth: 2,
+            lineWidth: lw,
             priceLineVisible: false,
             lastValueVisible: false,
             crosshairMarkerBorderColor: this.cssVar('--ts-bg'),
@@ -1237,7 +1465,7 @@ export class ChartViewComponent implements OnDestroy {
         type: 'Line' as SeriesType,
         options: {
           color: recent ? meta.color : hexA(meta.color, 0.28 + i * 0.14),
-          lineWidth: recent ? 2 : 1,
+          lineWidth: recent ? this.colors.lineWidth() : 1,
           priceLineVisible: false,
           lastValueVisible: false,
           crosshairMarkerVisible: recent,
@@ -1264,7 +1492,7 @@ export class ChartViewComponent implements OnDestroy {
         type: 'Line',
         options: {
           color: meta.color,
-          lineWidth: 2,
+          lineWidth: this.colors.lineWidth(),
           lineType: kind === 'strip' ? LineType.WithSteps : LineType.Simple,
           pointMarkersVisible: kind === 'forward',
           priceLineVisible: false,
@@ -1288,10 +1516,11 @@ export class ChartViewComponent implements OnDestroy {
     this.setMarker(data.length ? data[data.length - 1].time : asOf, 'AS OF');
     const last = data[data.length - 1];
     const area = type === 'area';
+    const lw = this.colors.lineWidth();
     const options = area
       ? {
           lineColor: meta.color,
-          lineWidth: 2,
+          lineWidth: lw,
           topColor: hexA(meta.color, 0.28),
           bottomColor: hexA(meta.color, 0.02),
           priceLineVisible: false,
@@ -1301,7 +1530,7 @@ export class ChartViewComponent implements OnDestroy {
         }
       : {
           color: meta.color,
-          lineWidth: 2,
+          lineWidth: lw,
           priceLineVisible: false,
           lastValueVisible: false,
           crosshairMarkerBackgroundColor: meta.color,
@@ -1432,8 +1661,12 @@ export class ChartViewComponent implements OnDestroy {
       // Freeze pan/zoom while measuring so the drag draws instead of scrolling.
       this.chart.applyOptions({ handleScroll: false, handleScale: false });
       e.preventDefault();
-    } else if (this.measure()) {
-      this.measure.set(null); // plain click dismisses a finished measurement
+    } else {
+      if (this.measure()) this.measure.set(null); // plain click dismisses a measurement
+      // Clicking the chart itself drops focus — but not when the click landed
+      // on a handle, which is the control that sets it.
+      const el = e.target as HTMLElement | null;
+      if (!el?.closest('.lastdot')) this.interaction.clearFocus();
     }
   }
 
@@ -1478,6 +1711,7 @@ export class ChartViewComponent implements OnDestroy {
 
   @HostListener('window:keydown.escape')
   onEscape(): void {
+    this.interaction.clearFocus();
     if (this.measure()) {
       this.measuring = false;
       this.releaseMeasurePointer();
@@ -1542,12 +1776,31 @@ export class ChartViewComponent implements OnDestroy {
     }
   }
 
+  private overlayRaf = 0;
+
+  /**
+   * Coalesce overlay work into one frame. Resize, every visible-range change
+   * and every render all land here, and the pass now reads layout
+   * (`priceScale().width()`) — running it synchronously per event is a
+   * read/write thrash during a pan.
+   */
+  private scheduleOverlays(): void {
+    if (this.overlayRaf) return;
+    this.overlayRaf = requestAnimationFrame(() => {
+      this.overlayRaf = 0;
+      this.updateOverlays();
+    });
+  }
+
   private updateOverlays(): void {
     const chart = this.chart;
     if (!chart) return;
     // Markers ride the same triggers as the other overlays: resize, visible
-    // range change, and post-render. rAF-coalesced by the callers.
+    // range change, and post-render.
     this.updateMarkers();
+    // The value chips occupy the axis lane exactly, so its width is part of
+    // the layout, not a decoration.
+    this.scaleW.set(Math.max(MIN_SCALE_W, Math.round(chart.priceScale('right').width())));
     const mode = this.mode();
     if (mode === 'seasonal' || mode === 'forward' || mode === 'strip') {
       this.markerX.set(null);
@@ -1562,6 +1815,7 @@ export class ChartViewComponent implements OnDestroy {
       const y = a.api.priceToCoordinate(a.last);
       if (y !== null) {
         tags.push({
+          id: a.legendId,
           y: Math.round(y),
           value: a.last,
           color: a.color,
@@ -1571,18 +1825,111 @@ export class ChartViewComponent implements OnDestroy {
         });
       }
     }
-    // De-overlap: sweep down enforcing a 16px gap, then clamp to the host so
-    // near-equal last values (spread trades!) stay individually legible.
+    this.valueTags.set(this.deOverlap(tags));
+    this.updateDots(symOf);
+    this.applyFocus();
+    this.reserveLabelStrip(true);
+    // Measure for the NEXT fit; reading it here costs nothing extra, since the
+    // pass has already touched layout for the price-scale width.
+    const widest = this.hostEl.nativeElement.querySelectorAll('.lastval');
+    let w = 0;
+    for (const el of widest) w = Math.max(w, (el as HTMLElement).offsetWidth);
+    if (w > 0) this.chipStripW = w;
+  }
+
+  /**
+   * Push near-equal last values apart so spread trades stay legible.
+   *
+   * Sweeps BOTH ways: down enforcing the step, then up off the bottom clamp,
+   * then down again off the top. A single downward sweep with only a bottom
+   * clamp (what this was) cascades the topmost chip to a negative y, where the
+   * pane's `overflow: hidden` deletes it — a label silently missing is worse
+   * than a label slightly off its price.
+   */
+  private deOverlap(tags: ValueTag[]): ValueTag[] {
+    const n = tags.length;
+    if (n === 0) return tags;
     tags.sort((a, b) => a.y - b.y);
-    for (let i = 1; i < tags.length; i++) {
-      if (tags[i].y - tags[i - 1].y < 16) tags[i].y = tags[i - 1].y + 16;
-    }
     const hostH = this.host().nativeElement.clientHeight;
-    for (let i = tags.length - 1; i >= 0; i--) {
-      const maxY = hostH - 34 - (tags.length - 1 - i) * 16;
-      if (tags[i].y > maxY) tags[i].y = maxY;
+    const top = TAG_H / 2 + 2;
+    const bottom = Math.max(top, hostH - AXIS_H - TAG_H / 2);
+    // Squeeze the gap before squeezing anything out: at the floor the chips
+    // touch, which is what a compressed axis looks like on a terminal.
+    const step =
+      n > 1
+        ? Math.max(TAG_H, Math.min(TAG_H + TAG_GAP, (bottom - top) / (n - 1)))
+        : TAG_H + TAG_GAP;
+
+    let prev = -Infinity;
+    for (const t of tags) {
+      t.y = Math.max(t.y, prev + step);
+      prev = t.y;
     }
-    this.valueTags.set(tags);
+    let limit = bottom;
+    for (let i = n - 1; i >= 0; i--) {
+      tags[i].y = Math.min(tags[i].y, limit);
+      limit = tags[i].y - step;
+    }
+    if (tags[0].y < top) {
+      let y = top;
+      for (const t of tags) {
+        t.y = Math.max(t.y, y);
+        y = t.y + step;
+      }
+    }
+    for (const t of tags) t.y = Math.round(t.y);
+    return tags;
+  }
+
+  /** Position the clickable handle on each tracked series' last point. */
+  private updateDots(symOf?: Map<string, string>): void {
+    const chart = this.chart;
+    if (!chart) return;
+    const syms = symOf ?? new Map(this.series().map((s) => [s.id, s.symbol]));
+    const ts = chart.timeScale();
+    const focus = this.interaction.focusedId();
+    const lead = this.sel.primaryId();
+    const w = this.host().nativeElement.clientWidth;
+    const dots: LastDot[] = [];
+    for (const a of this.active) {
+      if (!a.track || a.kind === 'Candlestick' || !a.lastTime) continue;
+      const x = ts.timeToCoordinate(a.lastTime as Time);
+      const y = a.api.priceToCoordinate(a.last);
+      // Panning the last bar out of view must take its handle with it.
+      if (x === null || y === null || x < 0 || x > w) continue;
+      dots.push({
+        id: a.legendId,
+        x: Math.round(x),
+        y: Math.round(y),
+        color: a.color,
+        label: syms.get(a.legendId) ?? '',
+        lead: a.legendId === lead && focus === null,
+        on: a.legendId === focus,
+      });
+    }
+    this.lastDots.set(dots);
+  }
+
+  /**
+   * Focus = "show me this line's actual observations". Native per-point markers
+   * on ONE series, and only while the visible range is sparse enough for them
+   * to be points rather than a bead; past that the line just thickens.
+   */
+  private applyFocus(): void {
+    const focus = this.interaction.focusedId();
+    const range = this.chart?.timeScale().getVisibleLogicalRange();
+    const bars = range ? Math.abs(range.to - range.from) : Infinity;
+    const plotW = this.host().nativeElement.clientWidth - this.scaleW();
+    const sparse = bars > 0 && plotW / bars >= MIN_POINT_SPACING;
+    for (const a of this.active) {
+      if (a.kind === 'Candlestick') continue;
+      const on = a.track && a.legendId === focus;
+      a.api.applyOptions({
+        pointMarkersVisible: a.basePoints || (on && sparse),
+        pointMarkersRadius: 2.5,
+        lineWidth: on ? a.baseWidth + 1 : a.baseWidth,
+      } as never);
+    }
   }
 
   private applyTheme(): void {

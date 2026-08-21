@@ -20,6 +20,22 @@ export interface HoverState {
 export class ChartInteractionService {
   readonly hover = signal<HoverState | null>(null);
 
+  /**
+   * The one series currently showing its individual observations (id, or null).
+   * Lives here rather than in a pane so split panes agree — two panes drawing
+   * point markers for different series is the same misread as two panes at
+   * different zooms.
+   */
+  readonly focusedId = signal<string | null>(null);
+
+  toggleFocus(id: string): void {
+    this.focusedId.update((v) => (v === id ? null : id));
+  }
+
+  clearFocus(): void {
+    this.focusedId.set(null);
+  }
+
   publish(state: HoverState): void {
     this.hover.set(state);
   }

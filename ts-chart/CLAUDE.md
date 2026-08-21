@@ -57,19 +57,51 @@ but leaves the playbook stale is an incomplete change.
   chart. Never stored in catalog metadata, never raw hex in components (charts
   are the one exception: canvas needs concrete hex). The SAME color AND glyph
   appear in tree dot, legend, inspector, search row, and right-edge label.
-- **Palette is an accessibility preference**, one of five variants
-  (`series-palettes.ts`), persisted to `tschart.palette` — its own key, NOT the
-  workspace, so it survives "Reset layout" and applies before restore paints.
-  The CVD variants are deliberately not lightness-normalized; see
-  `docs/ACCESSIBILITY_GUIDE.md` §3 before "fixing" them.
+- **Palette is an accessibility preference**, one of **three** variants
+  (`default`, `cvd-rg`, `mono` in `series-palettes.ts`), persisted to
+  `tschart.palette` — its own key, NOT the workspace, so it survives "Reset
+  layout" and applies before restore paints. Retired ids migrate through
+  `RETIRED_PALETTES`, never through the "never chosen" branch. Stroke weight is
+  `colors.lineWidth()`, never a literal. The CVD variants are deliberately not
+  lightness-normalized; see `docs/ACCESSIBILITY_GUIDE.md` §3 before "fixing" them.
+- **Series shapes are ONE preference** (`tschart.markers`, Auto/On/Off) governing
+  the canvas marks AND the chrome glyph, through the single choke point
+  `SeriesColorService.glyph()`. Never gate one surface without the other.
 - **Identity at scale**: lines are always **solid** (dash = semantic only, never
   identity); shape is the redundant channel instead. The authoritative identifier
   for many series is the right-edge colored **glyph + symbol + value** label
-  (`ValueTag`/`.lastval`), de-overlapped. On-canvas markers are sparse (~6 across
-  the visible range, never per bar) and skipped above 12 drawn series.
+  (`ValueTag`/`.lastval`), **split at the price-scale border** — name chip on the
+  pane, value chip sized to `priceScale('right').width()` in the axis lane — and
+  de-overlapped by a two-way sweep clamped at BOTH ends (a one-way sweep pushed the
+  top chip off-pane, where `overflow: hidden` ate it). `reserveLabelStrip()`
+  keeps the last bar clear of that label strip — a measured px margin converted to
+  bars, NOT `rightOffset` (counted in bars, and discarded by `fitContent()`). On-canvas identity markers are
+  sparse (~6 across the visible range, never per bar) and skipped above 12 drawn
+  series.
+- **Per-series focus**: every tracked series' last point carries a clickable
+  `.lastdot`; the lead series' one is ringed. Clicking focuses that series and draws
+  its individual observations (`pointMarkersVisible` on that one series), gated on
+  **bar spacing ≥ 11px** — never on point count — and degrading to a heavier line
+  below that. Click on the pane or Escape releases. State lives on
+  `ChartInteractionService.focusedId` so split panes agree. Only last points are hit
+  targets; hover-testing every point is a per-frame nearest-point search.
 - **Search goes through `SERIES_SEARCH_PROVIDER` only.** No component imports the
-  catalog for search; result rows render from a self-contained `SeriesHit`. See
+  catalog for search; result rows render from a self-contained `SeriesHit`, and
+  "recent" rows resolve via `SearchService.lookup()`. See
   `docs/SEARCH_ARCHITECTURE.md` — breaking this silently un-does the backend swap.
+- **⌘K is a finder.** Recent searches (`tschart.recentq`) + series + a short list
+  of destructive/export actions. No layout/mode/panel commands — those all have a
+  visible one-click control. It renders through the **CDK overlay** with
+  `cdkTrapFocus` (a hand-rolled `z-index: 91` sat below the overlay container at
+  1000), still with NO scrim, and its Escape does not bubble to the dock dismiss.
+  One `role="listbox"` over all three groups; `ts-search-results` renders
+  `[embedded]` with an `[indexOffset]` and emits global indices.
+- **Undo/redo covers the selection domain only** (`core/history.service.ts`):
+  add / remove / only-this / hide / show / reorder / clear / eviction, each with a
+  label ("Undo remove TTF"). Snapshots include the **colour slot map** — slots are
+  path-dependent, so without it an undone removal returns in a different colour.
+  In memory only, never persisted. Buttons live in the **chart card header**;
+  ⌘Z / ⌘⇧Z / Ctrl+Y are behind the `typing` guard in `app.ts`.
 - **Readouts never carry forward.** At the crosshair, a series with no point on
   the hovered date shows `—`, never a stale last value (`legendRows` hovering
   guard; `cardRows` filter).
@@ -102,7 +134,8 @@ never wraps (strip truncates first; mode renders segmented above a 1040px
 *container* query and as a dropdown below it). The card's footer is a control
 bar — zoom/fit left, interval right — and provenance lives in the series
 inspector and the legend row tooltip. Preferences go in the user menu,
-never in toolbars.
+never in toolbars. Global search is **left-anchored at a fixed 340px** — a box
+that flexes with the window moves its own hit target.
 
 ## Architecture notes
 

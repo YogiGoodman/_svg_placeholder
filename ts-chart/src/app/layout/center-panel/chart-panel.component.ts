@@ -12,6 +12,8 @@ import { LucideAngularModule } from 'lucide-angular';
 import { SelectionService, ASOF_MIN } from '../../core/selection.service';
 import { ChartInteractionService } from '../../core/chart-interaction.service';
 import { FullscreenService } from '../../core/fullscreen.service';
+import { HistoryService } from '../../core/history.service';
+import { CardActionsService } from '../../core/card-actions.service';
 import { ScreenshotService } from '../../core/screenshot.service';
 import {
   computeStats,
@@ -258,6 +260,31 @@ const LAYOUTS: { id: ChartLayout; label: string; icon: string }[] = [
               <lucide-icon name="table" [size]="14" /> Data
             </button>
           </div>
+
+          <div class="sep"></div>
+
+          <!-- Undo/redo sit with the other card actions, not in the app toolbar:
+               what they undo is what this card shows. Labels are dynamic — a
+               button that says "Undo" tells you nothing about what is about to
+               come back. -->
+          <button
+            class="ts-icon-btn"
+            [disabled]="!history.canUndo()"
+            (click)="history.undo()"
+            [tsTooltip]="history.undoLabel() ? 'Undo ' + history.undoLabel() + ' (⌘Z)' : 'Nothing to undo'"
+            aria-label="Undo"
+          >
+            <lucide-icon name="undo-2" [size]="16" />
+          </button>
+          <button
+            class="ts-icon-btn"
+            [disabled]="!history.canRedo()"
+            (click)="history.redo()"
+            [tsTooltip]="history.redoLabel() ? 'Redo ' + history.redoLabel() + ' (⌘⇧Z)' : 'Nothing to redo'"
+            aria-label="Redo"
+          >
+            <lucide-icon name="redo-2" [size]="16" />
+          </button>
 
           <div class="sep"></div>
 
@@ -818,8 +845,15 @@ const LAYOUTS: { id: ChartLayout; label: string; icon: string }[] = [
 export class ChartPanelComponent {
   readonly sel = inject(SelectionService);
   readonly fs = inject(FullscreenService);
+  readonly history = inject(HistoryService);
+  private readonly cardActions = inject(CardActionsService);
   private readonly shot = inject(ScreenshotService);
   private readonly interaction = inject(ChartInteractionService);
+
+  constructor() {
+    // The ⌘K "Screenshot" command runs the card's own capture.
+    this.cardActions.registerChart({ screenshot: () => void this.capture() });
+  }
 
   private readonly card = viewChild.required<ElementRef<HTMLElement>>('card');
   /** Every mounted pane. Split panes zoom together — comparing two windows that
