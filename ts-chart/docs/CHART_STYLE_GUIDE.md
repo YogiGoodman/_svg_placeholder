@@ -107,11 +107,17 @@ chart.addSeries(CandlestickSeries, {
    a dashed amber (`--ts-highlight`) vertical rule + pill; recompute on
    `subscribeVisibleLogicalRangeChange` and via a `ResizeObserver`. In `asof` mode
    the same primitive becomes the "AS OF" cut; in `seasonal` it is hidden.
-3. **Per-series value tags.** For each visible series, a tag in the series color
-   pinned to the right edge at `series.priceToCoordinate(last)` — so every line reads
-   its own last value. **De-overlap them**: sort by y, sweep down enforcing a
-   16px minimum gap, clamp to the host — near-equal last values (spread trades)
-   must stay individually legible.
+3. **Per-series value tags — two chips, not one.** For each visible series, a
+   label in the series color pinned at `series.priceToCoordinate(last)`, split at
+   the price-scale border: the **name chip** (glyph + symbol) sits on the pane, the
+   **value chip** sits in the axis lane, sized to `priceScale('right').width()` and
+   text-inset to line up with the ticks. Values belong in the value column; a
+   single wide chip has to cover a tick to be read. Give the scale a
+   `minimumWidth` so the lane stops resizing under the chips as tick text changes.
+   **De-overlap them**: sort by y, then sweep **down** enforcing the step, **up**
+   off the bottom clamp, and down again off the top — near-equal last values
+   (spread trades) must stay individually legible. Under compression the step
+   shrinks to the chip height so chips touch; nothing is ever dropped.
 4. **OHLC readout for candles.** The legend value area shows
    `O … H … L … C …` (letters muted, values bright, C colored vs open) driven
    by the crosshair, falling back to the last bar. Close-only readouts on
@@ -240,10 +246,12 @@ Keep the same `IChartApi` instance — never destroy the chart just to recolor i
 ## 9. Scale & resilience (round 10)
 
 **Right-edge identity labels.** The per-series value tags carry **symbol + value**
-(`ValueTag { y, value, color, label }`, rendered as `.lastval` with `__sym` +
-`__val`). They are de-overlapped (16px sweep + host clamp) and are the authoritative
-identifier past the palette core. Populate `label` from a `series() → symbol` map in
-`updateOverlays()`. Lines stay solid (`LineStyle.Solid`); dash is semantic only.
+(`ValueTag { id, y, value, color, label }`, rendered as `.lastval` with `__name` +
+`__val`). They are de-overlapped (two-way sweep, clamped top and bottom) and are the
+authoritative identifier past the palette core. Populate `label` from a
+`series() → symbol` map in `updateOverlays()`, and track the row by series id — after
+the y-sort, index is not identity. Lines stay solid (`LineStyle.Solid`); dash is
+semantic only.
 
 **Data hygiene at the boundary.** Every point array passes `sanitizePoints`
 (`src/app/data/sanitize.ts`) immediately before `api.setData` in `render()`: drops
@@ -267,3 +275,107 @@ reserved for price-axis values + identity labels and controls must not occlude t
 **Multi-field observations (target).** OHLC/bid-ask series show one field per series
 in compare; per-field chips only when a single/few series are focused. See
 `DESIGN_GUIDE.md` §7.4.
+
+---
+
+## 10 · Pane containment, markers and viewport control (round 11)
+
+### Clip every overlay to its pane
+
+`.chart-host` and `.pane` both set `overflow: hidden`. The measure rectangle,
+its label and the right-edge value tags are absolutely positioned against the
+host, and in a split layout the panes are flex siblings separated only by a
+border. A border is not a boundary: without the clip those overlays paint over
+the neighbouring chart and read as *that* chart's data.
+
+### Any drag takes pointer capture
+
+`setPointerCapture` on pointerdown, and `pointercancel` / `lostpointercapture`
+handled identically to `pointerup`. A shift-drag released over a sibling pane
+otherwise never delivers the origin's `pointerup`, so the origin stays at
+`handleScroll/handleScale: false` — pan and zoom dead until Escape. Wrap the
+call in try/catch: it throws `NotFoundError` for a pointer the browser no longer
+tracks, and that must not skip the cleanup that follows it.
+
+Leave the price-scale strip alone — that is lightweight-charts' own drag target
+(`axisPressedMouseMove`), so a measure must not start there.
+
+### Identity markers: sparse, never per bar
+
+```ts
+createSeriesMarkers(series, marks, { zOrder: 'aboveSeries' })
+```
+
+Six marks across the visible range plus one pinned at the last bar, recomputed
+on `subscribeVisibleLogicalRangeChange` behind a single rAF guard, and skipped
+entirely above 12 drawn series. One mark per bar turns a 730-point daily series
+into a mat of dots and makes the redraw O(n).
+
+**Four shapes exist** — `SeriesMarkerShape = 'circle' | 'square' | 'arrowUp' |
+'arrowDown'` (`typings.d.ts:4922`). That covers three glyph cycles with one
+spare. The DOM chrome is SVG and unconstrained.
+
+Lines stay `lineStyle: Solid`; dash remains semantic-only. Stroke **weight** comes
+from the palette (`SeriesColorService.lineWidth()`, default 2, `mono` 3) — never a
+literal in a spec builder, or a palette that promises a heavier line quietly fails
+to deliver one.
+
+### Viewport controls live on the card, not the pane
+
+`chart-panel` holds `viewChildren(ChartViewComponent)` and fans `zoomBy(±1)` /
+`fitAll()` to every pane, so split panes stay on one window. Two panes at
+different zooms do not merely look untidy — they invite a misread.
+
+---
+
+## 11 · Last-point handles and per-series focus (round 12)
+
+### The identity chip is two chips
+
+The right-edge label straddles the price-scale border: **name chip on the pane,
+value chip in the axis lane** (`.lastval__name` / `.lastval__val`, the value sized
+to `chart.priceScale('right').width()` each overlay pass). The axis lane is where
+values already live; a one-piece chip has to paint over a tick to show one.
+
+Give the time scale room for that strip, and derive the room from the strip:
+`reserveLabelStrip()` widens the visible logical range by the measured chip width
+converted to bars. `rightOffset` cannot do this — it is counted in BARS and
+`fitContent()` discards it, so at a narrow pane width the last bar lands under its
+own label and the handle on it is unclickable.
+
+Two traps on the way in, both worth stating because both look right:
+`timeScale().options().barSpacing` returns the *configured* default (6), unrelated
+to what a fit produced; and extending the range relative to itself compounds — the
+boot sequence fits more than once, and the data ended up a sliver on the left.
+Compute the target from the data (`points - 1 + bars`, spacing = `plotWidth /
+points`) so every call gives the same answer, and re-derive it on resize (only
+while the range still starts at the fitted edge, so a user's own zoom is left
+alone) — the margin is in bars, the pane is in pixels, and a dock toggle otherwise
+leaves a band of whitespace.
+
+### One handle per series' last point, clickable
+
+A DOM dot (`.lastdot`) at `timeToCoordinate(lastTime)` × `priceToCoordinate(last)`
+for every tracked series; the **lead series** (`sel.primaryId()`) carries a ring and
+a slow pulse, and only while nothing is focused. Clicking one focuses that series and
+shows its **individual observations** (`pointMarkersVisible` on that series alone);
+clicking the pane or pressing Escape releases it. The legend's colour dot is the same
+control, so focus is reachable without a pointer.
+
+**Only last points are hit targets.** Hover-testing every point — what TradingView
+does — costs a nearest-point search across all series on every `pointermove`; last
+points are N absolutely-positioned nodes the browser hit-tests for free.
+
+**Gate the markers on spacing, not on count.** `plotWidth / visibleBars >= 11px`,
+recomputed on the visible-range subscription. Below that the circles touch and read
+as a bead, so focus degrades to a heavier line (`baseWidth + 1`). Keep the spec's own
+`pointMarkersVisible` (forward curves) as the floor so focus can never clear it.
+
+Focus lives on `ChartInteractionService`, not in the pane — two split panes drawing
+points for different series is the same misread as two panes at different zooms.
+
+### Overlays get one frame, not one per event
+
+`scheduleOverlays()` coalesces resize, visible-range change and post-render into a
+single rAF. The pass now reads layout (`priceScale().width()`), so running it
+synchronously per event is a read/write thrash during a pan.

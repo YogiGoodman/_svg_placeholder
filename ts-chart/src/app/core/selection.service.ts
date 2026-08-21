@@ -3,6 +3,7 @@ import { ChartedSeries, ChartLayout, ChartMode, ChartType, SeriesMeta } from '..
 import { SERIES } from '../data/series-catalog.data';
 import { typeSupported, unionModes } from './modes';
 import { SeriesColorService } from './series-color.service';
+import { HistoryService } from './history.service';
 import { IntervalKey, TODAY } from '../data/series-generator';
 
 const RECENT_KEY = 'tschart.recent';
@@ -47,6 +48,7 @@ interface WorkspaceState {
 @Injectable({ providedIn: 'root' })
 export class SelectionService {
   private readonly colors = inject(SeriesColorService);
+  private readonly history = inject(HistoryService);
   /** Workspace snapshot restored from localStorage (silent — screen looks as left). */
   private readonly ws = this.readWorkspace();
 
@@ -137,31 +139,66 @@ export class SelectionService {
   }
 
   /** Toggle a series in/out of the selection (tree + search rows use this). */
-  toggle(id: string): void {
-    if (!SERIES[id]) return;
+  toggle(id: string): { evicted: string | null } {
+    if (!SERIES[id]) return { evicted: null };
     if (this.selectedIds().includes(id)) {
       this.remove(id);
-    } else {
-      this.add(id);
+      return { evicted: null };
     }
+    return this.add(id);
   }
 
-  add(id: string): void {
-    if (!SERIES[id]) return;
+  /** Display symbol for an id, for surfaces that must not import the catalog. */
+  symbolOf(id: string): string {
+    return SERIES[id]?.symbol ?? id;
+  }
+
+  /** Symbol of the series that would be evicted next at the cap. */
+  readonly oldestSymbol = computed(() => {
+    const id = this.selectedIds()[0];
+    return id ? SERIES[id]?.symbol : undefined;
+  });
+
+  /**
+   * Add a series, reporting what it displaced.
+   *
+   * At the cap this silently `shift()`ed the oldest, and `colors.sync()` then
+   * handed the newcomer the freed slot — so a line vanished and the chart
+   * appeared to recolor with nothing on screen explaining why. The eviction is
+   * still the right behaviour (blocking mid-flow is worse), but callers can now
+   * say what happened and offer an undo. Existing callers that ignore the
+   * return value are unaffected.
+   */
+  add(id: string): { evicted: string | null } {
+    if (!SERIES[id]) return { evicted: null };
+    if (this.selectedIds().includes(id)) return { evicted: null };
+    this.history.record(`add ${SERIES[id].symbol}`);
+    let evicted: string | null = null;
     this.selectedIds.update((list) => {
       if (list.includes(id)) return list;
       const next = [...list, id];
-      // Drop oldest when over the cap.
-      while (next.length > this.maxSeries()) next.shift();
+      while (next.length > this.maxSeries()) {
+        const dropped = next.shift();
+        if (dropped) evicted = dropped;
+      }
       return next;
     });
     this.colors.sync(this.selectedIds());
     this.pushRecent(id);
+    return { evicted };
+  }
+
+  /** Undo an eviction: put the dropped series back and remove what replaced it. */
+  restoreEvicted(evicted: string, added: string): void {
+    this.history.record(`restore ${SERIES[evicted]?.symbol ?? evicted}`);
+    this.selectedIds.update((list) => [evicted, ...list.filter((x) => x !== added)]);
+    this.colors.sync(this.selectedIds());
   }
 
   /** Replace the whole selection with a single series (deep-link / single pick). */
   select(id: string): void {
     if (!SERIES[id]) return;
+    this.history.record(`chart only ${SERIES[id].symbol}`);
     this.selectedIds.set([id]);
     this.colors.sync(this.selectedIds());
     this.hiddenIds.set([]);
@@ -171,6 +208,28 @@ export class SelectionService {
   constructor() {
     // Restored selection needs its color slots before first render.
     this.colors.sync(this.selectedIds());
+
+    // Undo owns the destructive domain only — see SelectionSnapshot for why
+    // mode/type/interval are deliberately outside it. Registering (rather than
+    // letting history inject this service) keeps the dependency edge one-way.
+    this.history.register(
+      () => ({
+        selectedIds: this.selectedIds(),
+        hiddenIds: this.hiddenIds(),
+        compareIds: this.compareIds(),
+        slots: this.colors.slotSnapshot(),
+      }),
+      (snap) => {
+        this.selectedIds.set([...snap.selectedIds]);
+        this.hiddenIds.set([...snap.hiddenIds]);
+        this.compareIds.set([...snap.compareIds]);
+        // Slots first, then sync: sync preserves what it finds, so restoring the
+        // map is what gives a series its original colour back rather than the
+        // next free one.
+        this.colors.restoreSlots(snap.slots);
+        this.colors.sync(this.selectedIds());
+      },
+    );
 
     // Persist the workspace on every relevant change (cheap, synchronous).
     effect(() => {
@@ -212,13 +271,36 @@ export class SelectionService {
   }
 
   remove(id: string): void {
+    if (!this.selectedIds().includes(id)) return;
+    this.history.record(`remove ${SERIES[id]?.symbol ?? id}`);
     this.selectedIds.update((list) => list.filter((x) => x !== id));
     this.colors.sync(this.selectedIds());
     this.hiddenIds.update((list) => list.filter((x) => x !== id));
     this.compareIds.update((list) => list.filter((x) => x !== id));
   }
 
+  /**
+   * Move a selected series to a new position. Order is meaningful in three
+   * places at once: the inspector card list, the legend rows, and the chart's
+   * draw order (later = on top). Reordering deliberately does NOT recolor —
+   * `SeriesColorService.sync()` keys slots by id, so a series keeps its color
+   * for its whole lifetime on the chart no matter where it sits in the list.
+   */
+  reorder(from: number, to: number): void {
+    if (from !== to) this.history.record('reorder series');
+    this.selectedIds.update((list) => {
+      if (from === to || from < 0 || to < 0 || from >= list.length || to >= list.length) return list;
+      const next = [...list];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
+    this.colors.sync(this.selectedIds());
+  }
+
   clear(): void {
+    if (!this.selectedIds().length) return;
+    this.history.record(`clear ${this.selectedIds().length} series`);
     this.selectedIds.set([]);
     this.colors.sync([]);
     this.hiddenIds.set([]);
@@ -268,6 +350,7 @@ export class SelectionService {
   }
 
   toggleHidden(id: string): void {
+    this.history.record(`${this.isHidden(id) ? 'show' : 'hide'} ${SERIES[id]?.symbol ?? id}`);
     this.hiddenIds.update((list) =>
       list.includes(id) ? list.filter((x) => x !== id) : [...list, id],
     );

@@ -5,8 +5,16 @@ import {
   inject,
   output,
 } from '@angular/core';
+import {
+  CdkDrag,
+  CdkDragDrop,
+  CdkDragHandle,
+  CdkDropList,
+} from '@angular/cdk/drag-drop';
 import { LucideAngularModule } from 'lucide-angular';
 import { SelectionService } from '../../core/selection.service';
+import { SeriesColorService } from '../../core/series-color.service';
+import { SeriesGlyphComponent } from '../../core/series-glyph.component';
 import { ChartedSeries } from '../../data/models';
 import {
   computeStats,
@@ -27,7 +35,15 @@ interface SeriesCard {
   selector: 'app-info-panel',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [LucideAngularModule, TooltipDirective, InfoCardComponent],
+  imports: [
+    LucideAngularModule,
+    TooltipDirective,
+    InfoCardComponent,
+    CdkDropList,
+    CdkDrag,
+    CdkDragHandle,
+      SeriesGlyphComponent,
+  ],
   template: `
     <section class="panel">
       <header class="phead">
@@ -46,8 +62,18 @@ interface SeriesCard {
         </button>
       </header>
 
-      <div class="scroll">
-        @for (c of cards(); track c.meta.id) {
+      <div
+        class="scroll"
+        cdkDropList
+        cdkDropListAutoScrollStep="18"
+        (cdkDropListDropped)="onDrop($event)"
+      >
+        @for (c of cards(); track c.meta.id; let i = $index) {
+          <!-- No custom placeholder: CDK's default is a clone of the dragged
+               card, so the gap is always exactly the height of what is being
+               moved. A fixed-height stand-in matched a COLLAPSED card and made
+               every drop of an expanded one re-settle. -->
+          <div class="drag" cdkDrag cdkDragPreviewContainer="parent" [cdkDragData]="c.meta.id">
           <app-info-card [title]="c.meta.symbol">
             <div card-actions class="hdr">
               <span
@@ -65,10 +91,24 @@ interface SeriesCard {
               <button class="rm ts-icon-btn" (click)="sel.remove(c.meta.id)" tsTooltip="Remove series">
                 <lucide-icon name="trash-2" [size]="14" />
               </button>
+              <button
+                class="grip ts-icon-btn"
+                cdkDragHandle
+                (keydown)="onGripKey($event, i)"
+                tsTooltip="Drag to reorder, or Alt + ↑/↓ — also sets legend order and which line draws on top"
+                [attr.aria-label]="'Reorder ' + c.meta.symbol + ', position ' + (i + 1) + ' of ' + cards().length"
+              >
+                <lucide-icon name="grip-vertical" [size]="14" />
+              </button>
             </div>
             <div class="cardbody">
               <div class="cardbody__hero">
-                <span class="dot" [style.background]="c.meta.color"></span>
+                <ts-glyph
+                  class="dot"
+                  [glyph]="colors.glyph(c.meta.id)"
+                  [color]="c.meta.color"
+                  [size]="9"
+                />
                 <span class="nm ts-truncate">{{ c.meta.name }}</span>
               </div>
               <dl class="kv">
@@ -82,6 +122,7 @@ interface SeriesCard {
               </dl>
             </div>
           </app-info-card>
+          </div>
         } @empty {
           <div class="ts-empty small">
             <img src="assets/placeholders/placeholder-quadrant.svg" alt="" />
@@ -144,6 +185,56 @@ interface SeriesCard {
         flex-direction: column;
         gap: var(--ts-space-3);
       }
+      /* The grip is the only affordance that is not always visible: a row of
+         permanent drag handles reads as clutter in a panel you mostly read. */
+      .grip {
+        width: 22px;
+        height: 22px;
+        cursor: grab;
+        opacity: 0;
+        transition: opacity var(--ts-dur-1) var(--ts-ease);
+      }
+      .drag:hover .grip,
+      .grip:focus-visible {
+        opacity: 1;
+      }
+      .grip:active {
+        cursor: grabbing;
+      }
+      /* Preview stays inside this component, or the emulated-encapsulation
+         attribute stops matching once CDK reparents it to <body> and these
+         styles silently do nothing. */
+      .cdk-drag-preview {
+        border-radius: var(--ts-radius-md);
+        box-shadow: var(--ts-shadow-3);
+      }
+      /* The placeholder is a clone: hide its content, keep its box. */
+      .cdk-drag-placeholder {
+        position: relative;
+      }
+      .cdk-drag-placeholder > * {
+        visibility: hidden;
+      }
+      .cdk-drag-placeholder::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        border: 1px dashed var(--ts-accent);
+        border-radius: var(--ts-radius-md);
+        background: var(--ts-accent-weak);
+      }
+      /* Rows must keep up with the pointer: a 180ms ease still reads as lag
+         when you drag card 1 past nine others. */
+      .cdk-drag-animating,
+      .scroll.cdk-drop-list-dragging .drag:not(.cdk-drag-placeholder) {
+        transition: transform var(--ts-dur-1) var(--ts-ease-out);
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .cdk-drag-animating,
+        .scroll.cdk-drop-list-dragging .drag:not(.cdk-drag-placeholder) {
+          transition: none;
+        }
+      }
       .cardbody {
         display: flex;
         flex-direction: column;
@@ -192,10 +283,6 @@ interface SeriesCard {
         white-space: nowrap;
         font-variant-numeric: tabular-nums;
       }
-      .chg lucide-icon {
-        display: inline-flex;
-        flex: none;
-      }
       .kv {
         display: grid;
         grid-template-columns: auto 1fr;
@@ -229,6 +316,30 @@ interface SeriesCard {
   ],
 })
 export class InfoPanelComponent {
+  readonly colors = inject(SeriesColorService);
+
+  /** Cards are ordered by `selectedIds`, so a drop is a selection reorder —
+   *  which is also what re-orders the legend and the chart's draw order. */
+  onDrop(e: CdkDragDrop<unknown>): void {
+    this.sel.reorder(e.previousIndex, e.currentIndex);
+  }
+
+  /**
+   * Keyboard reorder. CDK's drag has no keyboard mode, and a handle that only
+   * answers a mouse is not a control — the panel resizer already sets this bar.
+   * Alt is required so ↑/↓ still walk the panel for everyone else.
+   */
+  onGripKey(e: KeyboardEvent, index: number): void {
+    if (!e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
+    const to = index + (e.key === 'ArrowUp' ? -1 : 1);
+    if (to < 0 || to >= this.cards().length) return;
+    e.preventDefault();
+    this.sel.reorder(index, to);
+    // Focus rides with the card, which the @for track re-orders under us.
+    const grips = (e.currentTarget as HTMLElement).closest('.scroll')?.querySelectorAll('.grip');
+    queueMicrotask(() => (grips?.[to] as HTMLElement | undefined)?.focus());
+  }
+
   readonly sel = inject(SelectionService);
 
   /** Emitted when the dock's own close control is used (rail mirrors this). */

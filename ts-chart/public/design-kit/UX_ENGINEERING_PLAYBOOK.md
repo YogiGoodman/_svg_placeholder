@@ -90,8 +90,16 @@ no series shouts, none recedes, and none collides with the chrome grays.
 *Why:* naive hex palettes (e.g. lime `#a3e635` vs slate `#8fa1b6`) differ wildly
 in perceived brightness — the eye reads brightness as importance, which is a lie
 about the data.
-*Source:* `SERIES_PALETTE` in `series-color.service.ts` (24 dark/light pairs — a
+*Source:* `SERIES_PALETTES.default` in `series-palettes.ts` (24 dark/light pairs — a
 12-hue core plus 12 finer fills for high-N compare); standard: **CSS Color 4 / OKLCh**.
+
+> **Carve-out — normalize lightness only while hue is carrying identity.**
+> When the hue axis collapses, lightness stops being noise and becomes the
+> channel doing the work. The colour-vision-deficiency palettes
+> (`cvd-rg`, `mono`) are deliberately spread across
+> lightness, and "fixing" them to a fixed L would destroy exactly what makes
+> them legible. The floor is contrast, not uniformity: every entry still clears
+> 3:1 against the chart well. See rule 12 and `ACCESSIBILITY_GUIDE.md`.
 
 **9. Dual theme is one set of token names, remapped — never a fork.**
 Components reference `var(--ts-*)`; light theme redefines the same names.
@@ -122,6 +130,15 @@ Any number under 12px must sit at **≥4.5:1** against its surface. Keep a separ
 the whole point.
 *Source:* `--ts-text-muted` (tuned to ~5.5:1) vs `--ts-text-faint`;
 standard: **WCAG 2.1 SC 1.4.3**.
+
+A chart line is not text — it is a *graphical object*, and its floor is **3:1**,
+measured against the chart well it is drawn on rather than the panel behind it.
+Measure it; do not eyeball it. Two failures found this way that both looked
+fine: a palette step at 2.27:1, and a chip ink chosen by testing luminance
+against a threshold instead of comparing actual contrast, which put white text
+at 2.1:1 on a colour where black would have given 8.7:1.
+*Standard:* **WCAG 2.1 SC 1.4.11**. *Source:* `contrastRatio()` / `readableOn()`
+in `series-palettes.ts`.
 
 ---
 
@@ -185,13 +202,16 @@ enable it if *any* series supports it and dim the incompatible ones in the legen
 trader for comparing.
 *Source:* `src/app/core/modes.ts` (`unionModes`); legend `n/a` state.
 
-**21. De-overlap value tags and floating labels.**
-After positioning right-edge tags, sweep and clamp them to a minimum gap. The tags
-carry **symbol + value** (not value alone) — see Rule 31, they are the identifier
-at high series counts.
+**21. De-overlap value tags and floating labels — in BOTH directions.**
+After positioning right-edge tags, sweep them apart to a minimum gap: down enforcing
+the step, up off the bottom clamp, then down off the top clamp. Squeeze the gap
+before dropping any label; at the floor the chips touch. The tags carry **symbol +
+value** (not value alone) — see Rule 31, they are the identifier at high series
+counts.
 *Why:* two series at near-equal levels — the exact case in a spread trade — stack
-into an illegible smear without a de-overlap pass.
-*Source:* `chart-view.component.ts` `updateOverlays()` (`ValueTag`, `.lastval`).
+into an illegible smear without a de-overlap pass; and a one-way sweep with a single
+clamp cascades the far end off-screen, where `overflow: hidden` deletes it silently.
+*Source:* `chart-view.component.ts` `deOverlap()` (`ValueTag`, `.lastval`).
 
 **22. Own the legend, markers, and tooltips as DOM overlays.**
 Draw live values, per-series tags, the today/as-of marker, and any crosshair
@@ -337,7 +357,10 @@ real backend that returns holes. These rules keep it legible and unbreakable.
 **31. Identity at scale = solid line + right-edge colored name/value label.**
 Past roughly the palette core (~8–12 series) hue alone can no longer guarantee two
 lines are told apart. The authoritative identifier is a **colored pill at the
-right edge carrying the series symbol and its value**, de-overlapped and sorted.
+right edge carrying the series symbol and its value**, de-overlapped and sorted —
+split at the axis border, so the value sits in the value column and the name on the
+pane (the axis lane belongs to values; a label that covers a tick to show one has
+taken the wrong lane).
 Lines stay **solid**; dash/dot styles are reserved for semantic meaning
 (forecast, vintage), never identity.
 *Why:* on capital.com's 30-series compare view you read the right-edge labels, not
@@ -411,6 +434,27 @@ repeat them.
 | **Permanent left+right panels** for tree/details | ~22% of chart width rented for transient tasks | dock the tree, keep the inspector on-demand; §1 |
 | **Modal overlay drawers + blur scrim over the chart** | operator cannot read the chart while selecting; blur reads as a smudge; failed desk review | primary surface stays visible — chrome docks in-flow or is non-modal, never a modal veil; §1 |
 | **Line-style (dash/dot) to tell series apart** at high N | dashes already mean forecast/vintage — reusing them for identity destroys that meaning | keep lines solid; identify by right-edge colored name/value label; §31 |
+| **Separate "Deuteranopia" and "Protanopia" palettes** | their simulations of a blue/orange/yellow/purple set are near-identical, so the second option asks the user to self-diagnose a condition most know only as "some colours look the same to me" | ship ONE "Red–green safe"; give the user the palette, not a diagnosis; §38 |
+| **Five accessibility palettes** | a menu of five asks the reader to rank their own condition against four alternatives before the app is usable; one of the five (high-contrast) never even delivered its heavier stroke | three at most — hue-blind, colourless, everyone else; §45 |
+| **A preference that governed the canvas but not the chrome** | shapes Off stripped the marks from the lines and left them beside every series name, so the identity system disagreed with itself | one preference, one choke point (`glyph()`), both surfaces; §45 |
+| **A fixed-height drag placeholder** | it matched a collapsed card, so dropping an expanded one left a gap smaller than the card and every row re-settled | let the framework clone the dragged element; a placeholder is a hole the same shape as what left it |
+| **OKLCh-normalizing the CVD palettes** like the default one | when the hue axis collapses, lightness is the channel carrying identity — flattening it deletes what makes the palette work | normalize lightness only while hue carries identity; §8 carve-out |
+| **A marker on every bar** as the redundant encoding | a 730-point daily series becomes a mat of dots and the redraw is O(n) | anchor ~6 across the visible range plus the last bar; §39 |
+| **One-way de-overlap sweep** (down + bottom clamp only) | a tall stack cascaded the topmost label to a negative y, where the pane's `overflow: hidden` deleted it — a label silently missing, not merely misplaced | sweep both ways and clamp both ends; §21 |
+| **Gating per-point markers on point COUNT** | 130 daily points cleared a 240-point cap and still drew a solid bead — the cap measured the wrong thing | gate on pixels per point, not points; §44 |
+| **Recency added to the relevance score** | three recently-viewed Brent contracts outranked Brent Crude Oil itself for the query "brent" | recency is a tie-break BELOW canonical-ness, never a score addend; §42 |
+| **Chip ink chosen by a luminance threshold** | mid-tones sit right on the boundary: a colour at L=0.445 took white at 2.1:1 where black gave 8.7:1 | compare both candidates' actual contrast and take the winner; §12 |
+| **`<button>` rows inside `role="listbox"`** | breaks option counting in NVDA/JAWS | use `role="option"` divs and preventDefault on mousedown, or the input blurs before the click lands; §43 |
+| **A blur scrim behind the ⌘K palette** | it is the one surface a trader opens *while watching the tape*; a veil over live data had already failed desk review once | separate by elevation and shadow; no palette exception to the no-veil rule |
+| **A hand-rolled `position: fixed; z-index: 91` dialog** | the app's overlay container sits at 1000, so the user menu and the search dropdown painted straight over the "modal" | put dialogs in the app's overlay layer; a stacking context you invented loses to the one the framework owns; §47 |
+| **A dialog without a focus trap** | Tab walked out of the open palette into the app behind it, and closing left focus on `<body>` | trap on open, restore on close; §47 |
+| **Command rows outside the listbox they were announced from** | `aria-activedescendant` named an id that was not in `aria-controls`, so arrowing onto an action announced nothing | one listbox, groups inside it, one flat index space; §43 |
+| **⌘Z bound without the typing guard** | it hijacked native text undo inside the palette input, the search box and the as-of date field | mod-key shortcuts that shadow a native editing command must respect focus; §47 |
+| **Assuming a vendor list widget virtualizes** | `dx-list` has no `scrollingMode`; its only knob appends and grows, so 500 results means 500 live nodes | check the typings before designing around a capability; use CDK virtual scroll where recycling matters |
+| **A root theme service injected only by the one component that needed it** | a `providedIn: 'root'` service whose whole job is a constructor `effect()` does nothing until something injects it — any second consumer boots un-themed | inject it where the lifetime should start, not where it is convenient |
+| **Absolutely-positioned overlays in a flex pane row without a clip** | the measure rect and value tags painted over the neighbouring chart | clip at the pane; §40 |
+| **Drag without pointer capture** | a drag released over a sibling pane never delivered the origin's `pointerup`, leaving pan/zoom permanently disabled there | take capture on pointerdown and treat `pointercancel`/`lostpointercapture` as end-of-drag; §41 |
+| **A range picker gated by a mode whose value applies in every mode** | a window set in as-of mode stayed applied after switching, with no control left to clear it | never gate the only control for a value that is not itself gated |
 | **Stale carry-forward value in the legend on hover** | showed a value on a date where the series had no point — a phantom reading | at the crosshair, absent point → "—", never the last known value; §33 |
 | **`SYM +N` legend header** | duplicated identity (row 1) and mode (toolbar) already on screen | don't repeat a value the eye can already see |
 | **Hardcoded per-series colors in the catalog** | didn't scale past a demo catalog; not theme-aware | assign colors at runtime; §7–8 |
@@ -525,7 +569,149 @@ to embedded widgets too.
 
 ---
 
+## 11 · Accessibility, identity and search (round 11)
+
+**38. Give the user the palette, not a diagnosis.**
+Offer a small named set of colour schemes with plain-language labels and a live
+preview, and let people pick by looking. Never ask them to choose between
+"deuteranopia" and "protanopia".
+*Why:* most people with CVD know it as "some colours look the same to me", not
+as a clinical name — and the two palettes would look nearly identical anyway.
+*Source:* `SERIES_PALETTES` + the Accessibility group in `user-menu.component.ts`.
+
+**39. When the hue axis collapses, add a second channel — and never dash.**
+A red-green-safe categorical palette tops out around **8** reliably separable
+colours (Okabe–Ito is 8). Bind identity to a *slot*, and let a slot resolve to
+a colour **and** a shape: `colour = entries[slot % n]`, `glyph = glyphs[⌊slot/n⌋]`.
+Markers on the line stay sparse — ~6 across the visible range, never per bar.
+*Why:* without the second channel, series 9 silently repeats a colour and two
+lines become indistinguishable with nothing on screen saying so. Dash is not
+available as that channel wherever it already carries semantic meaning.
+*Source:* `series-palettes.ts`, `series-glyph.component.ts`, `updateMarkers()` in
+`chart-view.component.ts`; standard: **Okabe–Ito / Color Universal Design**.
+
+**40. An absolutely-positioned overlay needs a clip, or it belongs to the next pane.**
+Any overlay drawn relative to a chart host — measurement rectangles, edge labels,
+markers — must be clipped to that host once panes are siblings in a flex row.
+*Why:* a border is not a boundary. Without `overflow: hidden` the overlay paints
+over the neighbouring chart and reads as that chart's data.
+*Source:* `.chart-host` / `.pane` in `chart-view` / `chart-panel`.
+
+**41. Any drag takes pointer capture, and ends on cancel as well as up.**
+*Why:* a drag released outside its origin never delivers that element's
+`pointerup`. Anything the drag disabled on the way in — pan, zoom, text
+selection, a cursor override — stays disabled forever.
+*Source:* measure drag in `chart-view.component.ts`; dock resizer in
+`workspace.component.ts`.
+
+**42. One search service, N surfaces — and rank by match quality, not by history.**
+Put search behind a provider token whose request shape is the wire shape. Give
+each surface its own session but one shared provider, cache and ranking. Order
+by match quality, then canonical-ness (shorter symbol beats the contracts
+derived from it), and only then recency.
+*Why:* the swap to a server should be one binding, not an edit to every caller;
+and what a trader opened yesterday must not outrank the benchmark they just
+typed the name of.
+*Source:* `src/app/search/` — `search.types.ts`, `search.service.ts`,
+`local-series-search.provider.ts`.
+
+**43. A typeahead is a conveyor, not a dialog — and its rows are `option`s.**
+Picking a result acts and keeps the surface open, clearing the input for the next
+ticker. Rows are `role="option"` inside a `role="listbox"`, driven by
+`aria-activedescendant`, and they must `preventDefault()` on mousedown.
+*Why:* traders add several series in one pass; a surface that closes on each pick
+triples the keystrokes. And a `<button>` inside a listbox breaks option counting
+in NVDA/JAWS, while an un-prevented mousedown blurs the input and closes the
+surface before the click resolves.
+*Source:* `search-results.component.ts`, `command-palette.component.ts`.
+
+**44. Never flash empty.**
+Keep the previous results on screen while the next request is in flight, and keep
+them again when it fails — with a retry, not a blank list.
+*Why:* a list that empties and refills on every keystroke is unreadable while you
+type, and an error that also erases what you had is two failures instead of one.
+*Source:* `SearchService.createSession` (cache-first paint, error keeps hits).
+
+**45. An effect that writes a signal must not transitively read it.**
+Wrap the body in `untracked()` when it calls into anything that touches its own
+state.
+*Why:* reading a signal anywhere inside an effect registers it as a dependency,
+including through a helper several calls deep. The palette's reset effect called
+`session.setQuery()`, picked up the session's signals, and reset the query to
+empty on every keystroke.
+*Source:* `command-palette.component.ts` constructor.
+
+**46. Measure a surface before and after you restructure it.**
+Capture `getBoundingClientRect()` plus the computed background, border, radius,
+shadow, font, padding and transition timings in both themes and both densities,
+then diff. Screenshots supplement; the numbers decide.
+*Why:* "it looks the same" is not a claim anyone can check, and a full-page
+capture can be a cached frame.
+*Source:* the parity harness used for this round; §2 of `DEVEXTREME_TREELIST_GUIDE.md`.
+
+---
+
 *This playbook is a living document. Per the `CLAUDE.md` sync contract, any future
 change that establishes a transferable trader-facing UX/engineering learning must
 add or update the corresponding entry here (and record rejected approaches in the
 failure log), then re-sync to the exported kit.*
+
+**44. A focused series may show its observations; nothing else may.**
+Give each series' last point a clickable handle, and let a click reveal that ONE
+series' individual data points (native per-point markers), released by a click on the
+pane or Escape. Gate the markers on **bar spacing in pixels** (≥ ~11px), not on point
+count, and fall back to a heavier line when the range is dense. Hit-test only last
+points — never every point on every `pointermove`.
+*Why:* "which line is this, and where are its real observations" is a question a
+compare chart cannot otherwise answer; doing it for all series at once, or per-frame
+hover-testing every point, buys the question back at the cost of the canvas.
+*Source:* `chart-view.component.ts` (`.lastdot`, `applyFocus()`, `MIN_POINT_SPACING`);
+`ChartInteractionService.focusedId`; standard: **TradingView last-value handle**.
+
+**45. An accessibility preference is a choice a person makes about themselves —
+keep it short, make it whole, and migrate it.**
+Cap the variants (three, not five): every extra option is a self-diagnosis
+demanded before the app can be used. Let ONE control govern every surface the
+channel appears on, through a single choke point — a preference that reaches the
+canvas but not the chrome makes the identity system contradict itself. And when a
+variant is retired, map the stored id to its successor; falling through to the
+"never chosen" branch silently re-decides for the one user who had decided.
+*Why:* the audience for these settings is least able to afford a menu that makes
+them classify themselves, and least likely to notice a preference that half-applied.
+*Source:* `series-palettes.ts` (`PALETTE_LIST`, `RETIRED_PALETTES`);
+`SeriesColorService` (`glyph()`, `readPalette()`); `ACCESSIBILITY_GUIDE.md` §3.
+
+**46. Anchor global search at a fixed width, not a flexible one.**
+Put it at one end of the toolbar (left, terminal-style) with a fixed basis, and let
+a spacer take the slack. Its dropdown may be wider than the box, but the box itself
+must not resize with the window.
+*Why:* a search field that grows to fill the chrome reads as the app's main content,
+and moves its own hit target every time the window changes — the opposite of a
+command line you hit without looking.
+*Source:* `toolbar.component.ts` (`.spacer`), `toolbar-search.component.ts`
+(`flex: 0 0 340px`, `dropdownWidth()`); standard: **Eikon / Bloomberg command line**.
+
+**47. Undo covers the destructive domain — not every setting.**
+Put selection-shaped actions on the stack (add, remove, only-this, hide, show,
+reorder, clear, cap eviction) with a **label naming the action**, so the control
+reads "Undo remove TTF" rather than "Undo". Leave view settings off it: they are
+one visible click away, and mixing them in means pressing ⌘Z twice expecting a
+series back and getting an interval change. Snapshot any **path-dependent derived
+state** (here: colour slots) or the restore is not a restore — the series comes
+back in someone else's colour. Bind ⌘Z behind the same typing guard as any other
+shortcut that shadows a native editing command, and keep the stack in memory: a
+session restored from storage has no past to offer.
+*Why:* undo is only trusted if it is predictable, and "what does ⌘Z do here" must
+have one answer.
+*Source:* `core/history.service.ts` (`SelectionSnapshot`, `record`/`undo`/`redo`);
+`SelectionService` (register + `record()` call sites); `app.ts` typing guard.
+
+**48. A dialog belongs in the application's overlay layer.**
+Render modals and palettes through the framework's overlay/portal container, trap
+focus while open and restore it on close, and stop the closing Escape from
+bubbling into whatever else listens for it.
+*Why:* an invented stacking context loses to the framework's own — a "modal" at
+z-index 91 was painted over by menus at 1000 — and an untrapped dialog is one Tab
+away from not being a dialog at all.
+*Source:* `command-palette.component.ts` (CDK `Overlay` + `TemplatePortal` +
+`cdkTrapFocus`, `outsidePointerEvents`, scoped Escape).

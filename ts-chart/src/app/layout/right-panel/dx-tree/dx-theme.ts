@@ -24,9 +24,41 @@ export class DxThemeService {
   private readonly theme = inject(ThemeService);
 
   constructor() {
+    // Warm the sheet we are NOT currently using. `themes.current()` swaps the
+    // active tag's href, so without this the first theme toggle waits on a
+    // ~780kB download and DevExtreme surfaces flash unstyled. Prefetching here —
+    // rather than with a <link rel="preload"> in index.html — means the cost is
+    // paid only once a DevExtreme widget actually exists on screen, which keeps
+    // the deferred POC genuinely lazy.
+    //
+    // Note on swatches: they are NOT the mechanism for a global light/dark
+    // toggle. DevExpress scopes a swatch under `.dx-swatch-*` for mixing themes
+    // across REGIONS of one page, and warns that more than one may cause
+    // performance issues. Whole-stylesheet swapping is their documented answer
+    // here, and it is what this service does.
+    this.prefetchInactiveTheme();
+
     effect(() => {
       const next = this.theme.theme() === 'dark' ? 'generic.dark' : 'generic.light';
       if (dxThemes.current() !== next) dxThemes.current(next);
     });
+  }
+
+  /**
+   * This service is instantiated by whichever component first renders a
+   * DevExtreme widget. That coupling is deliberate (it keeps `devextreme/ui/themes`
+   * out of the eager bundle) but it is load-bearing: a DevExtreme widget rendered
+   * by a component that does NOT inject this service would boot with whatever
+   * `index.html` marked `data-active` and never follow the app's theme signal.
+   * If DevExtreme is ever used outside the POC panel, inject this there too.
+   */
+  private prefetchInactiveTheme(): void {
+    const inactive = this.theme.theme() === 'dark' ? 'dx.light.css' : 'dx.dark.css';
+    if (document.querySelector(`link[rel="prefetch"][href="${inactive}"]`)) return;
+    const link = document.createElement('link');
+    link.rel = 'prefetch';
+    link.as = 'style';
+    link.href = inactive;
+    document.head.appendChild(link);
   }
 }

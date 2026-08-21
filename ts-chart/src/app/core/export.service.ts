@@ -9,6 +9,8 @@ const KIT_FILES = [
   'UX_ENGINEERING_PLAYBOOK.md',
   'WORKSPACE_PERSISTENCE.md',
   'DEVEXTREME_TREELIST_GUIDE.md',
+  'ACCESSIBILITY_GUIDE.md',
+  'SEARCH_ARCHITECTURE.md',
   'scss/_tokens.scss',
   'scss/_utilities.scss',
   'scss/_reset.scss',

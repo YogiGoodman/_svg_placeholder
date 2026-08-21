@@ -761,13 +761,3 @@ export const TAB_ICONS: Record<TabId, string> = {
 };
 
 /** Flat search across all series for a query string. */
-export function searchSeries(query: string): SeriesMeta[] {
-  const q = query.trim().toLowerCase();
-  if (!q) return [];
-  return Object.values(SERIES).filter(
-    (s) =>
-      s.name.toLowerCase().includes(q) ||
-      s.symbol.toLowerCase().includes(q) ||
-      s.tags?.some((t) => t.includes(q)),
-  );
-}

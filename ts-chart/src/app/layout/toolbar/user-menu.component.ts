@@ -8,7 +8,10 @@ import {
   signal,
 } from '@angular/core';
 import { LucideAngularModule } from 'lucide-angular';
+import { TooltipDirective } from '../../core/tooltip.directive';
 import { Density, ThemeService } from '../../core/theme.service';
+import { MarkerMode, SeriesColorService } from '../../core/series-color.service';
+import { PALETTE_LIST } from '../../core/series-palettes';
 import { LayoutService } from '../../core/layout.service';
 import { SelectionService } from '../../core/selection.service';
 import { TreeStateService } from '../../core/tree-state.service';
@@ -19,7 +22,7 @@ import { ExportService } from '../../core/export.service';
   selector: 'app-user-menu',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [LucideAngularModule],
+  imports: [LucideAngularModule, TooltipDirective],
   template: `
     <div class="menu ts-panel" role="menu">
       <!-- Identity -->
@@ -58,6 +61,56 @@ import { ExportService } from '../../core/export.service';
       </div>
 
       <hr class="ts-divider" />
+
+      <div class="group">
+        <span class="group__label">Accessibility</span>
+
+        <div class="pref pref--col">
+          <span class="pref__label">
+            <lucide-icon name="accessibility" [size]="15" /> Series colors
+          </span>
+          <div class="palettes" role="radiogroup" aria-label="Series colors">
+            @for (p of palettes; track p.id) {
+              <button
+                class="pal"
+                role="radio"
+                [attr.aria-checked]="colors.palette() === p.id"
+                [class.is-active]="colors.palette() === p.id"
+                (click)="colors.setPalette(p.id)"
+                [tsTooltip]="p.hint"
+              >
+                <span class="pal__name">{{ p.label }}</span>
+                <!-- Live preview: choosing a palette for a condition you have
+                     is a judgement you can only make by looking at it. -->
+                <span class="pal__swatches">
+                  @for (e of p.entries; track $index) {
+                    <span class="pal__sw" [style.background]="theme.theme() === 'dark' ? e.dark : e.light"></span>
+                  }
+                </span>
+              </button>
+            }
+          </div>
+        </div>
+
+        <div class="pref">
+          <span class="pref__label">
+            <lucide-icon name="crosshair" [size]="15" /> Series shapes
+          </span>
+          <div class="ts-segmented" role="radiogroup" aria-label="Series shapes">
+            @for (m of markerModes; track m.id) {
+              <button
+                role="radio"
+                [attr.aria-checked]="colors.markerMode() === m.id"
+                [class.is-active]="colors.markerMode() === m.id"
+                (click)="colors.setMarkerMode(m.id)"
+                [tsTooltip]="m.hint"
+              >
+                {{ m.label }}
+              </button>
+            }
+          </div>
+        </div>
+      </div>
 
       <div class="group">
         <span class="group__label">Chart</span>
@@ -190,6 +243,47 @@ import { ExportService } from '../../core/export.service';
         gap: var(--ts-space-2);
         padding: var(--ts-space-1);
       }
+      .palettes {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .pal {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--ts-space-2);
+        padding: var(--ts-space-1) var(--ts-space-2);
+        border-radius: var(--ts-radius-sm);
+        color: var(--ts-text-secondary);
+        font-size: var(--ts-fs-xs);
+        cursor: pointer;
+        text-align: left;
+      }
+      .pal:hover {
+        background: var(--ts-bg-hover);
+        color: var(--ts-text-bright);
+      }
+      /* Active state is a border plus a tint, never a tint alone — this is the
+         one menu a color-blind user is most likely to be reading. */
+      .pal.is-active {
+        background: var(--ts-accent-weak);
+        color: var(--ts-text-bright);
+        box-shadow: inset 2px 0 0 var(--ts-accent-strong);
+      }
+      .pal__name {
+        white-space: nowrap;
+      }
+      .pal__swatches {
+        display: inline-flex;
+        gap: 2px;
+        flex: none;
+      }
+      .pal__sw {
+        width: 7px;
+        height: 12px;
+        border-radius: 1px;
+      }
       .group__label {
         font-size: var(--ts-fs-xxs);
         font-weight: var(--ts-fw-semibold);
@@ -270,6 +364,18 @@ export class UserMenuComponent {
   readonly sel = inject(SelectionService);
   readonly tree = inject(TreeStateService);
   private readonly layout = inject(LayoutService);
+  readonly colors = inject(SeriesColorService);
+
+  readonly palettes = PALETTE_LIST;
+  readonly markerModes: { id: MarkerMode; label: string; hint: string }[] = [
+    { id: 'auto', label: 'Auto', hint: 'On for palettes that need shape to tell series apart' },
+    {
+      id: 'always',
+      label: 'On',
+      hint: 'Shapes on the lines and beside every series name',
+    },
+    { id: 'never', label: 'Off', hint: 'Color and the right-edge label only — plain dots' },
+  ];
   private readonly exportSvc = inject(ExportService);
 
   readonly maxOptions = [4, 6, 8, 10, 12];

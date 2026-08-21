@@ -4,6 +4,7 @@ import { LucideAngularModule } from 'lucide-angular';
 import { ThemeService } from '../../core/theme.service';
 import { TooltipDirective } from '../../core/tooltip.directive';
 import { UserMenuComponent } from './user-menu.component';
+import { ToolbarSearchComponent } from './toolbar-search.component';
 
 export const APP_VERSION = '0.1.0';
 
@@ -11,7 +12,13 @@ export const APP_VERSION = '0.1.0';
   selector: 'app-toolbar',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [OverlayModule, LucideAngularModule, TooltipDirective, UserMenuComponent],
+  imports: [
+    OverlayModule,
+    LucideAngularModule,
+    TooltipDirective,
+    UserMenuComponent,
+    ToolbarSearchComponent,
+  ],
   template: `
     <header class="toolbar">
       <!-- Left cluster — panel toggles live on the rail, not here (no duplication) -->
@@ -35,9 +42,16 @@ export const APP_VERSION = '0.1.0';
           </span>
           <span class="wordmark">TS Chart</span>
         </div>
+
+        <!-- Search lives in the toolbar because it is a primary action, not a
+             panel toggle and not a preference — the two things doctrine keeps
+             out of here. Anchored LEFT at a fixed width, terminal-style: the
+             command line is a target you hit without looking, which a box that
+             changes width with the window is not. -->
+        <app-toolbar-search />
       </div>
 
-      <div class="spacer"></div>
+      <span class="spacer"></span>
 
       <!-- Right cluster -->
       <div class="cluster">
@@ -98,8 +112,12 @@ export const APP_VERSION = '0.1.0';
         align-items: center;
         gap: var(--ts-space-1);
       }
+      app-toolbar-search {
+        margin-left: var(--ts-space-4);
+      }
       .spacer {
-        flex: 1;
+        flex: 1 1 auto;
+        min-width: var(--ts-space-4);
       }
       .brand {
         display: flex;

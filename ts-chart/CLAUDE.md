@@ -19,8 +19,8 @@ MUST, in the same change:
 
 The kit files that must stay in sync: `AGENTS.md`, `DESIGN_GUIDE.md`,
 `CHART_STYLE_GUIDE.md`, `UX_ENGINEERING_PLAYBOOK.md`, `WORKSPACE_PERSISTENCE.md`,
-`DEVEXTREME_TREELIST_GUIDE.md`, `scss/*`, `tokens/*` (mirrors of `docs/` +
-`src/styles/`). The export list in `src/app/core/export.service.ts` must name
+`DEVEXTREME_TREELIST_GUIDE.md`, `ACCESSIBILITY_GUIDE.md`, `SEARCH_ARCHITECTURE.md`,
+`scss/*`, `tokens/*` (mirrors of `docs/` + `src/styles/`). The export list in `src/app/core/export.service.ts` must name
 every one of them — a guide that is not in `KIT_FILES` never reaches the zip.
 
 ## Also non-negotiable: keep the playbook current
@@ -50,15 +50,58 @@ but leaves the playbook stale is an incomplete change.
 - **Numbers are mono + tabular** (`.ts-mono`), always.
 - **Contrast**: numeric text under 12px uses tokens with ≥4.5:1 on their surface
   (`--ts-text-muted` is tuned for this; `--ts-text-faint` is decoration only).
-- **Series colors** come only from `SeriesColorService` (OKLCh-normalized
-  dual-theme 24-slot palette, assigned in selection order, stable for a series'
-  whole lifetime on the chart) — never stored in catalog metadata, never raw hex
-  in components (charts are the one exception: the palette itself is concrete hex
-  because canvas needs it). The SAME color appears in tree dot, legend, inspector,
-  and right-edge label.
+- **Series identity** comes only from `SeriesColorService`. A series gets a
+  **slot**, and a slot resolves to a color **and** a glyph:
+  `color = entries[slot % n]`, `glyph = glyphs[floor(slot / n)]`. Slots are
+  assigned in selection order and are stable for a series' whole lifetime on the
+  chart. Never stored in catalog metadata, never raw hex in components (charts
+  are the one exception: canvas needs concrete hex). The SAME color AND glyph
+  appear in tree dot, legend, inspector, search row, and right-edge label.
+- **Palette is an accessibility preference**, one of **three** variants
+  (`default`, `cvd-rg`, `mono` in `series-palettes.ts`), persisted to
+  `tschart.palette` — its own key, NOT the workspace, so it survives "Reset
+  layout" and applies before restore paints. Retired ids migrate through
+  `RETIRED_PALETTES`, never through the "never chosen" branch. Stroke weight is
+  `colors.lineWidth()`, never a literal. The CVD variants are deliberately not
+  lightness-normalized; see `docs/ACCESSIBILITY_GUIDE.md` §3 before "fixing" them.
+- **Series shapes are ONE preference** (`tschart.markers`, Auto/On/Off) governing
+  the canvas marks AND the chrome glyph, through the single choke point
+  `SeriesColorService.glyph()`. Never gate one surface without the other.
 - **Identity at scale**: lines are always **solid** (dash = semantic only, never
-  identity); the authoritative identifier for many series is the right-edge
-  colored **symbol + value** label (`ValueTag`/`.lastval`), de-overlapped.
+  identity); shape is the redundant channel instead. The authoritative identifier
+  for many series is the right-edge colored **glyph + symbol + value** label
+  (`ValueTag`/`.lastval`), **split at the price-scale border** — name chip on the
+  pane, value chip sized to `priceScale('right').width()` in the axis lane — and
+  de-overlapped by a two-way sweep clamped at BOTH ends (a one-way sweep pushed the
+  top chip off-pane, where `overflow: hidden` ate it). `reserveLabelStrip()`
+  keeps the last bar clear of that label strip — a measured px margin converted to
+  bars, NOT `rightOffset` (counted in bars, and discarded by `fitContent()`). On-canvas identity markers are
+  sparse (~6 across the visible range, never per bar) and skipped above 12 drawn
+  series.
+- **Per-series focus**: every tracked series' last point carries a clickable
+  `.lastdot`; the lead series' one is ringed. Clicking focuses that series and draws
+  its individual observations (`pointMarkersVisible` on that one series), gated on
+  **bar spacing ≥ 11px** — never on point count — and degrading to a heavier line
+  below that. Click on the pane or Escape releases. State lives on
+  `ChartInteractionService.focusedId` so split panes agree. Only last points are hit
+  targets; hover-testing every point is a per-frame nearest-point search.
+- **Search goes through `SERIES_SEARCH_PROVIDER` only.** No component imports the
+  catalog for search; result rows render from a self-contained `SeriesHit`, and
+  "recent" rows resolve via `SearchService.lookup()`. See
+  `docs/SEARCH_ARCHITECTURE.md` — breaking this silently un-does the backend swap.
+- **⌘K is a finder.** Recent searches (`tschart.recentq`) + series + a short list
+  of destructive/export actions. No layout/mode/panel commands — those all have a
+  visible one-click control. It renders through the **CDK overlay** with
+  `cdkTrapFocus` (a hand-rolled `z-index: 91` sat below the overlay container at
+  1000), still with NO scrim, and its Escape does not bubble to the dock dismiss.
+  One `role="listbox"` over all three groups; `ts-search-results` renders
+  `[embedded]` with an `[indexOffset]` and emits global indices.
+- **Undo/redo covers the selection domain only** (`core/history.service.ts`):
+  add / remove / only-this / hide / show / reorder / clear / eviction, each with a
+  label ("Undo remove TTF"). Snapshots include the **colour slot map** — slots are
+  path-dependent, so without it an undone removal returns in a different colour.
+  In memory only, never persisted. Buttons live in the **chart card header**;
+  ⌘Z / ⌘⇧Z / Ctrl+Y are behind the `typing` guard in `app.ts`.
 - **Readouts never carry forward.** At the crosshair, a series with no point on
   the hovered date shows `—`, never a stale last value (`legendRows` hovering
   guard; `cardRows` filter).
@@ -74,7 +117,9 @@ but leaves the playbook stale is an incomplete change.
 
 ## Layout doctrine (round-10 restructure)
 
-**Chart-first, chrome never veils the chart.** The chart card always owns its
+**Chart-first, chrome never veils the chart** — and this has **no exception for
+the ⌘K palette**, which is precisely the surface a trader opens while watching
+the tape. Separation is elevation and shadow; outside-click closes. The chart card always owns its
 pixels and is never covered. Selection (tree/search) and series details
 (inspector) are **in-flow docks** — the chart flexes beside them — toggled from
 the 48px icon rail (⌘K / ⌘/ / ⌘. also), each with its own close (×). The **tree
@@ -82,10 +127,15 @@ dock is persistent and OPEN by default** (a primary driver); the **inspector doc
 is non-modal and closed by default**. NO scrim, NO blur over the chart (a modal
 veil over live data fails desk review). On small screens docks collapse to fixed
 overlays. Dock state persists (`tschart.dock`). The rail is the single toggle
-owner — the toolbar carries no panel toggles. The chart header is ONE row that
-never wraps (strip truncates first; mode is a dropdown, intervals stay buttons);
-provenance lives in the card's status footer. Preferences go in the user menu,
-never in toolbars.
+owner — the toolbar carries no panel toggles, but it DOES carry global search,
+which is a primary action rather than a toggle or a preference (every trading
+terminal keeps search permanently visible). The chart header is ONE row that
+never wraps (strip truncates first; mode renders segmented above a 1040px
+*container* query and as a dropdown below it). The card's footer is a control
+bar — zoom/fit left, interval right — and provenance lives in the series
+inspector and the legend row tooltip. Preferences go in the user menu,
+never in toolbars. Global search is **left-anchored at a fixed 340px** — a box
+that flexes with the window moves its own hit target.
 
 ## Architecture notes
 
@@ -95,7 +145,15 @@ never in toolbars.
   URL deep-link params override on load. Production design:
   `docs/WORKSPACE_PERSISTENCE.md`.
 - Tree expansion: `TreeStateService` (survives tab switches). Legend collapse:
-  `tschart.legend`.
+  `tschart.legend`. Dock width: `tschart.dockWidth`. Palette / markers:
+  `tschart.palette`, `tschart.markers`.
+- **Search**: `src/app/search/` — one provider token, one service handing out
+  per-surface sessions, one shared results component. See
+  `docs/SEARCH_ARCHITECTURE.md`.
+- **DevExtreme** is confined to the TreeList POC and is `@defer`red. Its theme
+  service must be injected wherever a DX widget first renders — it is a root
+  service whose only job is a constructor `effect()`, so it does nothing until
+  something injects it.
 - Icons are a curated set in `core/icons.ts` — register before use; no
   duplicate keys (`Download` etc. already present).
 

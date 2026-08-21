@@ -404,3 +404,58 @@ closed and the operator can try again. Decide whether that is enough for you.
 - [ ] Child cap preference: 8 / 12 / 20 / All all take effect live
 - [ ] "Show N more" contrast and alignment in both themes
 - [ ] Empty search state
+
+---
+
+## 8 · Build vs. buy: where DevExtreme earns its place (round 11)
+
+Recorded so the next round does not re-litigate it. The question was whether to
+build the search surfaces out of DevExtreme widgets, given the licence and the
+framework's maturity. The answer came out **mixed**, and the reason is specific:
+**DevExtreme's strength here is its data layer, not its widgets.**
+
+| Need | Verdict | Why |
+|---|---|---|
+| Search data + paging seam | **DevExtreme** | `LoadOptions` already carries `skip`/`take`/`filter`/`searchValue` — an Elastic request in all but name. Zero styling, zero theme, zero ARIA surface, and `dx-tree-list` already speaks it. |
+| Long result list | Ours + CDK | **`dx-list` has no virtual scrolling.** `scrollingMode` does not exist on it; the only knob is `pageLoadMode`, which appends and grows, so 500 results means 500 live nodes. On the requirement that motivated the work, DX was the weaker option. |
+| ⌘K panel shell | Ours | `dx-popup` adds a title bar, drag, resize and a focus loop we would disable, to replace four lines of `position: fixed`. |
+| Toolbar dropdown | CDK | `cdkConnectedOverlay` is already used three lines away for the user menu. `dx-popover` would mean two visually different dropdowns in one toolbar. |
+| Search inputs | Ours | `dx-text-box` is an `<input>` with a clear button. Pure styling tax. |
+| Card reorder | CDK DragDrop | Genuinely close; `dx-sortable` works over arbitrary content. CDK edges it on idiom and on already being in the bundle. |
+| Dock resizer | Ours | `dx-resizable` writes inline `width` onto its host and repositions on left/top handles, which fights a flex sibling. The spec was zero layout width, visible only on hover. |
+
+The deciding costs: ~230 lines of scoped SCSS per widget (measured in §6 of this
+guide, against a 12kB/20kB `anyComponentStyle` budget), versus **zero extra CSS
+weight** because `dx.light.css` / `dx.dark.css` ship whole regardless. The
+tiebreaker was that keeping DevExtreme confined to this POC makes §7's own
+recommendation actionable — the panel is now `@defer`red, so DX is out of the
+eager bundle.
+
+### Two traps if a DX widget is ever adopted here
+
+1. **`dx-list` sets `role="application"`** on its focus target when non-empty
+   (`list.base.js:762`), which changes screen-reader interaction mode.
+2. **`grouped` + `collapsibleGroups` suppresses the outer `listbox` role** —
+   roles move down to per-group listboxes.
+
+### The theme service is load-bearing and easy to miss
+
+`DxThemeService` is `providedIn: 'root'` but its entire job is a constructor
+`effect()`, so it does nothing until something injects it. It is injected by the
+POC panel — the only component that renders a DX widget. **Any DevExtreme widget
+rendered by a component that does not inject it would boot with whatever
+`index.html` marked `data-active` and never follow the theme toggle.**
+
+It also prefetches the inactive stylesheet on construction, so the first theme
+swap is a cache hit rather than a ~780kB download with a visible flash. That
+prefetch lives in the service rather than as a `<link rel="preload">` in
+`index.html` precisely so it is paid only once a DX widget actually exists.
+
+### Colour swatches are the wrong tool for a light/dark toggle
+
+Worth stating because it looks like the answer and is not. DevExpress scopes a
+swatch under `.dx-swatch-*` for mixing themes across **regions** of one page —
+"the navigation sidebar should be dark and the content area light" — and warns
+that more than one may cause performance issues. Whole-stylesheet swapping via
+`themes.current()` is their documented mechanism for a global toggle, and it is
+what this service does.

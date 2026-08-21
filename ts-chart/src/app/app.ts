@@ -13,6 +13,8 @@ import {
   CommandPaletteComponent,
   CommandPaletteService,
 } from './layout/command-palette/command-palette.component';
+import { SearchFocusService } from './search/search-focus.service';
+import { HistoryService } from './core/history.service';
 
 @Component({
   selector: 'app-root',
@@ -36,6 +38,8 @@ export class App {
   private readonly theme = inject(ThemeService);
   private readonly selection = inject(SelectionService);
   private readonly palette = inject(CommandPaletteService);
+  private readonly searchFocus = inject(SearchFocusService);
+  private readonly history = inject(HistoryService);
 
   constructor() {
     // Optional deep-link (shareable): ?series=<id>[,<id>…]&mode=<mode>&layout=<layout>
@@ -55,6 +59,30 @@ export class App {
   @HostListener('window:keydown', ['$event'])
   onKey(e: KeyboardEvent): void {
     const mod = e.metaKey || e.ctrlKey;
+    // Bare "/" focuses search, but only when the user is not already typing —
+    // stealing a slash mid-query would be worse than not having the shortcut.
+    const el = e.target as HTMLElement | null;
+    const typing =
+      el?.tagName === 'INPUT' || el?.tagName === 'TEXTAREA' || el?.isContentEditable === true;
+    if (!mod && e.key === '/' && !typing) {
+      e.preventDefault();
+      this.searchFocus.focusToolbar();
+      return;
+    }
+    // Undo/redo are the ONE mod-key pair that must respect the typing guard:
+    // inside the ⌘K input, the search box or the as-of field, ⌘Z is the browser's
+    // text undo and stealing it is worse than not having the shortcut.
+    if (mod && !typing && e.key.toLowerCase() === 'z') {
+      e.preventDefault();
+      if (e.shiftKey) this.history.redo();
+      else this.history.undo();
+      return;
+    }
+    if (mod && !typing && e.key.toLowerCase() === 'y') {
+      e.preventDefault();
+      this.history.redo(); // Windows/Linux muscle memory
+      return;
+    }
     if (mod && e.key.toLowerCase() === 'k') {
       e.preventDefault();
       this.palette.toggle();

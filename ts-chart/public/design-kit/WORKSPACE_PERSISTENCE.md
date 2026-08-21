@@ -115,3 +115,46 @@ Named workspaces (N per user: `ws:{userId}:{slot}` + a list endpoint), shared
 read-only workspaces (tokenized link resolving server-side to a snapshot), and
 audit trail (append-only history table) all fit this schema without breaking
 `v: 1` clients — add fields behind the version gate.
+
+---
+
+## 5. Keys outside the workspace payload (round 11)
+
+Not everything belongs in `tschart.workspace`. These are stored separately and
+deliberately:
+
+| Key | Holds | Why it is not in the workspace |
+|---|---|---|
+| `tschart.palette` | Active series palette | An accessibility setting is a fact about the *person*, not this screen. Must survive "Reset layout" and apply before restore paints. |
+| `tschart.markers` | Series shape mode (canvas + chrome) | Same. |
+| `tschart.recentq` | Last 8 search queries (text) | A habit, not a screen. Recorded on a successful pick, never per keystroke. |
+| `tschart.dockWidth` | Browse dock width in px | Chrome geometry, not chart state. Replaces the vestigial `tschart.panelSizes`, which is now deleted on read. |
+| `tschart.theme`, `tschart.density` | Appearance | Pre-existing, same reasoning. |
+| `tschart.recent`, `tschart.legend`, `tschart.maxseries`, `tschart.treeChildLimit` | Pre-existing | — |
+
+**The payload version stays `v: 1`.** Round 11 added no field to the workspace
+snapshot, so no migration is needed. If one is ever added, `readWorkspace()`
+currently hard-rejects any `v !== 1` — that check must become a migration, or
+every existing user loses their screen on first load.
+
+---
+
+## 6. Undo/redo is in memory, on purpose (round 14)
+
+`HistoryService` holds a stack of selection snapshots
+(`{ selectedIds, hiddenIds, compareIds, slots }`) and is **never persisted**.
+
+- A restored session has no past. Offering ⌘Z for an action taken yesterday, on a
+  screen that has since been rebuilt from storage, promises an inverse we cannot
+  honour.
+- The stack is deliberately narrower than `WorkspaceState`: mode, type, interval
+  and as-of are outside it. They are one visible click away, and they sit behind
+  two self-correcting effects that rewrite them after a restore — so an undo of
+  them would not be a clean inverse.
+- `slots` is in the snapshot because colour slots are **path-dependent**.
+  `SeriesColorService.sync()` frees a removed series' slot for the next arrival,
+  so undoing a removal without restoring the map hands the series back in a
+  different colour than the one that was on screen a second earlier.
+
+The workspace persist effect fires on every undo step, which is correct — storage
+follows the screen — and cheap, since the payload is small.
